@@ -20,7 +20,7 @@ import numpy as np
 
 # Vector database imports
 try:
-    import pinecone
+    from pinecone import Pinecone, ServerlessSpec
     import chromadb
     from chromadb.config import Settings
     VECTOR_DB_AVAILABLE = True
@@ -109,20 +109,26 @@ class SemanticMemoryEngine:
         pinecone_api_key = self.config.get('pinecone_api_key') or os.getenv('PINECONE_API_KEY')
         if pinecone_api_key and VECTOR_DB_AVAILABLE:
             try:
-                pinecone.init(api_key=pinecone_api_key, environment=self.config.get('pinecone_env', 'us-east1-gcp'))
+                # Initialize Pinecone client (v3+ API)
+                pc = Pinecone(api_key=pinecone_api_key)
                 
                 index_name = self.config.get('pinecone_index', 'buddy-conversations')
                 
                 # Create index if it doesn't exist
-                if index_name not in pinecone.list_indexes():
-                    pinecone.create_index(
+                existing_indexes = [idx.name for idx in pc.list_indexes()]
+                if index_name not in existing_indexes:
+                    pc.create_index(
                         name=index_name,
                         dimension=self.embedding_dimension,
-                        metric='cosine'
+                        metric='cosine',
+                        spec=ServerlessSpec(
+                            cloud='aws',
+                            region='us-east-1'
+                        )
                     )
                     logger.info(f"Created Pinecone index: {index_name}")
                 
-                self.vector_index = pinecone.Index(index_name)
+                self.vector_index = pc.Index(index_name)
                 logger.info("Pinecone vector database connected")
                 
             except Exception as e:

@@ -78,27 +78,32 @@ class VectorDatabase:
     async def _initialize_pinecone(self):
         """Initialize Pinecone"""
         try:
-            import pinecone
+            from pinecone import Pinecone, ServerlessSpec
             
             api_key = self.config.get("api_key")
-            environment = self.config.get("environment", "us-west1-gcp")
             
             if not api_key:
                 raise ValueError("Pinecone API key not provided")
             
-            pinecone.init(api_key=api_key, environment=environment)
+            # Initialize Pinecone client (v3+ API)
+            pc = Pinecone(api_key=api_key)
             
             index_name = self.config.get("index_name", "buddy-context")
             
             # Check if index exists, create if not
-            if index_name not in pinecone.list_indexes():
-                pinecone.create_index(
-                    index_name,
+            existing_indexes = [idx.name for idx in pc.list_indexes()]
+            if index_name not in existing_indexes:
+                pc.create_index(
+                    name=index_name,
                     dimension=self.config.get("dimension", 384),
-                    metric="cosine"
+                    metric="cosine",
+                    spec=ServerlessSpec(
+                        cloud='aws',
+                        region='us-east-1'
+                    )
                 )
             
-            self.client = pinecone.Index(index_name)
+            self.client = pc.Index(index_name)
             self._connected = True
             
         except ImportError:
