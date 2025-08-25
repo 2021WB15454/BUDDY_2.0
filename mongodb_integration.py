@@ -341,7 +341,7 @@ class BuddyDatabase:
                 "event_type": event_type,
                 "user_id": user_id,
                 "timestamp": datetime.utcnow(),
-                "date": datetime.utcnow().date(),
+                "date": datetime.utcnow().isoformat()[:10],  # Store as string YYYY-MM-DD
                 "data": data or {}
             }
             

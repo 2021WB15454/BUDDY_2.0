@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUDDY Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background: rgba(40, 167, 69, 0.8); }
+        .error { background: rgba(220, 53, 69, 0.8); }
+        .info { background: rgba(23, 162, 184, 0.8); }
+        button {
+            background: #4facfe;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0099ff;
+        }
+        #chatTest {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 BUDDY Connection Test</h1>
+        
+        <div id="status" class="status info">
+            🔄 Testing connection...
+        </div>
+        
+        <button onclick="testHealth()">Test Health Endpoint</button>
+        <button onclick="testSkills()">Test Skills Endpoint</button>
+        <button onclick="testChat()">Test Chat</button>
+        
+        <div id="chatTest">
+            <h3>Chat Test</h3>
+            <input type="text" id="testMessage" placeholder="Type a test message..." value="Hello BUDDY!">
+            <button onclick="sendTestMessage()">Send</button>
+            <div id="chatResult" style="margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 5px; min-height: 50px;"></div>
+        </div>
+        
+        <div id="details" style="margin-top: 20px; font-size: 12px;">
+            <h3>Connection Details:</h3>
+            <ul>
+                <li>Backend API: http://localhost:8082</li>
+                <li>Web Server: http://localhost:3000</li>
+                <li>Database: MongoDB Atlas</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8082';
+        
+        async function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.innerHTML = message;
+            status.className = `status ${type}`;
+        }
+        
+        async function testHealth() {
+            try {
+                updateStatus('🔄 Testing health endpoint...', 'info');
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus(`✅ Health check successful! Database: ${data.database?.status || 'unknown'}`, 'success');
+                } else {
+                    updateStatus(`❌ Health check failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                updateStatus(`❌ Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testSkills() {
+            try {
+                updateStatus('🔄 Testing skills endpoint...', 'info');
+                const response = await fetch(`${API_URL}/skills`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus(`✅ Skills loaded: ${data.skills?.length || 0} skills available`, 'success');
+                } else {
+                    updateStatus(`❌ Skills test failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                updateStatus(`❌ Skills test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testChat() {
+            try {
+                updateStatus('🔄 Testing chat endpoint...', 'info');
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: 'Connection test',
+                        user_id: 'test_user',
+                        session_id: 'test_session'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateStatus(`✅ Chat test successful!`, 'success');
+                } else {
+                    updateStatus(`❌ Chat test failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                updateStatus(`❌ Chat test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function sendTestMessage() {
+            const messageInput = document.getElementById('testMessage');
+            const resultDiv = document.getElementById('chatResult');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            try {
+                resultDiv.innerHTML = '🔄 Sending message...';
+                
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        user_id: 'test_user',
+                        session_id: 'test_session'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <strong>You:</strong> ${message}<br>
+                        <strong>BUDDY:</strong> ${data.response}
+                    `;
+                } else {
+                    resultDiv.innerHTML = `❌ Error: ${response.status} - ${data.detail || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Connection error: ${error.message}`;
+            }
+        }
+        
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(testHealth, 1000);
+        });
+        
+        // Enter key support
+        document.getElementById('testMessage').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendTestMessage();
+            }
+        });
+    </script>
+</body>
+</html>

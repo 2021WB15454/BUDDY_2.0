@@ -311,7 +311,7 @@
     <script>
         class BuddyWebInterface {
             constructor() {
-                this.apiUrl = 'http://localhost:8080';
+                this.apiUrl = 'http://localhost:8082';
                 this.chatMessages = document.getElementById('chatMessages');
                 this.messageInput = document.getElementById('messageInput');
                 this.sendButton = document.getElementById('sendButton');
@@ -349,7 +349,7 @@
                 } catch (error) {
                     this.connectionStatus.textContent = 'Connection Error';
                     this.connectionStatus.style.color = '#dc3545';
-                    this.showError('Unable to connect to BUDDY API. Please ensure the server is running on port 8080.');
+                    this.showError('Unable to connect to BUDDY API. Please ensure the server is running on port 8082.');
                 }
             }
 
