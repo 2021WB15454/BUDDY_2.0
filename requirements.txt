@@ -1,0 +1,92 @@
+# BUDDY 2.0 Production Requirements for Render Deployment
+
+# Core Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+
+# Database Dependencies
+motor>=3.3.0
+pymongo>=4.6.0
+dnspython>=2.4.0
+
+# Vector Database
+pinecone-client>=2.2.4
+
+# MongoDB Integration
+pymongo[srv]>=4.6.0
+
+# Configuration and Environment
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+
+# HTTP Client
+httpx>=0.25.0
+aiohttp>=3.9.0
+
+# Authentication and Security
+pyjwt>=2.8.0
+bcrypt>=4.1.0
+cryptography>=41.0.0
+
+# Data Processing
+numpy>=1.24.0
+pandas>=2.1.0
+
+# AI and NLP (Core)
+openai>=1.3.0
+sentence-transformers>=2.2.2
+transformers>=4.35.0
+
+# Audio Processing (Basic)
+soundfile>=0.12.0
+
+# Utilities
+asyncio-throttle>=1.0.0
+requests>=2.31.0
+
+# Logging and Monitoring
+structlog>=23.0.0
+prometheus-client>=0.19.0
+
+# Date/Time
+python-dateutil>=2.8.0
+
+# JSON Processing
+orjson>=3.9.0
+
+# Background Tasks
+celery>=5.3.0
+redis>=5.0.0
+
+# Cross-Platform Support
+platformdirs>=4.0.0
+
+# Weather API (from your .env)
+requests>=2.31.0
+
+# Production WSGI Server
+gunicorn>=21.2.0
+
+# Health Checks
+psutil>=5.9.0
+
+# Optional: Lightweight ML for basic operations
+scikit-learn>=1.3.0
+
+# Development and Testing (optional for production)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# Firebase SDK
+firebase-admin>=6.2.0
+
+# For cross-device sync
+websockets>=12.0.0
+
+# Memory optimization
+pympler>=0.9.0
+
+# Async database operations
+databases[postgresql]>=0.8.0
