@@ -36,16 +36,42 @@ class BuddyStatusBridge:
             if self.is_connected:
                 return True
                 
-            # Get Firebase service account
+            # Try to get Firebase service account from file first
             service_account_path = "config/firebase-service-account.json"
+            cred = None
             
-            if not os.path.exists(service_account_path):
-                logger.warning(f"Firebase service account not found: {service_account_path}")
+            if os.path.exists(service_account_path):
+                # Use service account file (local development)
+                cred = credentials.Certificate(service_account_path)
+                logger.info("Using Firebase service account file")
+            else:
+                # Use environment variables (production deployment)
+                firebase_config = {
+                    "type": "service_account",
+                    "project_id": os.getenv("FIREBASE_PROJECT_ID", "buddyai-42493"),
+                    "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+                    "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace('\\n', '\n'),
+                    "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+                    "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{os.getenv('FIREBASE_CLIENT_EMAIL', '').replace('@', '%40')}",
+                    "universe_domain": "googleapis.com"
+                }
+                
+                # Check if we have the required environment variables
+                if firebase_config["private_key_id"] and firebase_config["private_key"] and firebase_config["client_email"]:
+                    cred = credentials.Certificate(firebase_config)
+                    logger.info("Using Firebase credentials from environment variables")
+                else:
+                    logger.warning("Firebase credentials not found in environment variables")
+                    return False
+            
+            if not cred:
+                logger.warning("No Firebase credentials available")
                 return False
                 
-            # Initialize Firebase Admin SDK
-            cred = credentials.Certificate(service_account_path)
-            
             # Firebase project configuration
             config = {
                 'databaseURL': 'https://buddyai-42493-default-rtdb.firebaseio.com'

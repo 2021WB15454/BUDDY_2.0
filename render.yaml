@@ -13,6 +13,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: RENDER_EXTERNAL_URL
+        value: https://buddy-2-0.onrender.com
       - key: MONGODB_URI
         value: mongodb+srv://BUDDY_AI:Preetty25@cluster0.fbbl9jd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
       - key: PINECONE_API_KEY
@@ -21,4 +23,14 @@ services:
         value: ff2cbe677bbfc325d2b615c86a20daef
       - key: BUDDY_JWT_SECRET
         value: OOF4DZRRk6ZX1P2xxTJTlQlfBU5Lqsg79ZI0K8sIAaEQY1jqX1nOi80FdtmcOdQZwRs1pn19XwdNQIWsz6wA
+      - key: FIREBASE_PROJECT_ID
+        value: buddyai-42493
+      - key: FIREBASE_PRIVATE_KEY_ID
+        value: 42121785a4c6dbdabbaf103dc0448080dcd5f1fb
+      - key: FIREBASE_PRIVATE_KEY
+        value: "-----BEGIN PRIVATE KEY-----\nMIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQChlVouyVZIUBO3\nqZF8oLefbWvrVCkL5aFjSvOfcjJOqrAKbUwv8gjdh+kyWP0VvZ0ZZWUslt3tqin4\nryAZ150U92SMCXjMvfqja5IzO4gRy7LV/jNAbVO8F2TEZSvXeCfgeZwpdRiND2HZ\npc5B/loSDtVhlB3NgWz+VIlypj4wterm5it5dYw1pPZuhmh1dOmL193j56anKv7q\n2u9Y6kE2wBsEOPBsT4tTGkundXhQn6RrL82Dz/hLlLXA+UGGr34MweTQ4q9KaleC\nrXkafQNudnD52QnZDLeRVi7sdNTtVYfae3/2+1lVVJgFf+c2RNKguHxK0lEexST5\nqvxLAkCPAgMBAAECgf9FPW3nnpJBBA9u8SEZ+cS1phRL3N4gVJLtRkqFiLafmLgK\nJjIyv9E/6X2ELzd3Zkk4S+31Rxc42jIiEbX8kBty+imb2HM4Fco3o2DpLOY7hsFo\nWAVrFjrlEe4CoPF1Se4y9emoQJ7EoFLN14vXu6ap4xfABWuMvgLc+SmGd4Muwhcz\neL8YdAU90Ct1UZLKSd69cLIsbOGM7B6CVZTuIzCCslvEsbg5OfmcgGl+6q6TOoUJ\nQtJbqKN7MGT1128veIDlA+w9NyJcidKgfKcWENdjtq1sFuSFSfRNsXzz1M1JYC2p\nPrPb0HfjMdtVPZwwoWK7qftVsMOg/ItWD7mch0kCgYEA0iHnExOPFuDWVaQ4VJNi\n6bwLUxnulueH84YXPAvf2UnxYn2T1/FwVCeNsT+HsyxKItv355yzRF0IlgXDbpHp\nzvRFod7Z6kue9Va16neTkmnKtiISU3tuOrtSnLQWiCtGQZBRaenoSiKfO6z3KDE5\nYrKU00fqWKK9FluYBum2I7kCgYEAxNqNzZCbRyNBardt+X4LyonEDpt72eXmjrQ3\neFe7BCquWwdWtqi8rlSs/GzDHdbVKxBQRCMh2D5LEow4Z1ABc298dEqfla0uXdGh\n9diK3WdBZKXp6mHc2qp/Rglqxkx/IzMBzIh8ApeblmOCHIbvBhF+oy4kpdQf7EKV\nCFiJuocCgYEAggg+wRxKYKLzn32G6jdmbzNRYrRaY4GVLIpe2GaUuBa8y/DfyzJ6\nC2mKkhO5OpP+sIGkb+wVNwnHJWcdn8+les7IRDnuacEv9awZ2KT0ahcTPQ/qfUSV\nWrzOi3AZvVviFvJinwMDHtU76ibHr1R+qWfPFsua5gyWrD4z3ptDfekCgYA2TpUQ\nQPSVi4RgjHoqejuGhLsxzHM+ic4xUEZ9TLarT5sKQdwKSELFVVbjzJ2Hfd0RJE8A\nfTC5F3Zeh5CH7+p2jisnae7cvAoul8a2rCajLfk8awk9QAJN0PuLts1eJ3xrmYbF\nhmGv1WN2+bzLYe5PHkRxgClcFkk4RKYYx1Q3wQKBgE8m16KHgcSmE0BRK59nbN77\nbSyT0GwcNhuYBUzbzUja+/Rq0DNod8oT5WkrupnHQU5WpKU/YMuaT8Ak1z7RLMwz\nagU1/NzUaDDgC2KNro7FiTIGMwwK8vpp3pX25cSdagOMNafKgjs6eaP/kJfkb1rj\nmn2DWqXHdSfjpxjqrFP6\n-----END PRIVATE KEY-----\n"
+      - key: FIREBASE_CLIENT_EMAIL
+        value: firebase-adminsdk-fbsvc@buddyai-42493.iam.gserviceaccount.com
+      - key: FIREBASE_CLIENT_ID
+        value: "100239735555307425587"
     autoDeploy: true
