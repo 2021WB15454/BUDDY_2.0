@@ -4,7 +4,7 @@ services:
     name: buddy-api
     runtime: python3
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn enhanced_backend:app --host 0.0.0.0 --port $PORT --worker-class uvicorn.workers.UvicornWorker --workers 2
+    startCommand: gunicorn app:app --host 0.0.0.0 --port $PORT --worker-class uvicorn.workers.UvicornWorker --workers 2
     plan: starter
     healthCheckPath: /health
     envVars:
