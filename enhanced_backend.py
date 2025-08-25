@@ -43,6 +43,20 @@ except ImportError:
 # Import Simplified NLP Engine as fallback
 from simplified_nlp_engine import get_simplified_nlp_engine
 
+# Import Firebase integration
+try:
+    from firebase_integration import (
+        get_firebase_manager, 
+        update_buddy_online_status, 
+        update_buddy_offline_status,
+        log_conversation_to_firebase,
+        verify_firebase_user
+    )
+    FIREBASE_AVAILABLE = True
+except ImportError:
+    FIREBASE_AVAILABLE = False
+    logger.warning("Firebase integration not available")
+
 # Weather API configuration
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "ff2cbe677bbfc325d2b615c86a20daef")
 WEATHER_BASE_URL = "http://api.openweathermap.org/data/2.5"
@@ -67,16 +81,58 @@ def debug_log_intent(intent: str, message: str | None = None):
             pass
 
 # Create FastAPI app
-app = FastAPI(title="BUDDY Backend API with MongoDB", version="0.2.0")
+app = FastAPI(title="BUDDY Backend API with MongoDB", version="2.0")
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
+    allow_origins=[
+        "https://buddyai-42493.web.app",  # Firebase hosting
+        "https://buddyai-42493.firebaseapp.com",  # Firebase hosting alternate
+        "http://localhost:3000",  # Local React development
+        "http://localhost:5000",  # Local Firebase hosting
+        "*"  # Allow all for development (restrict in production)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Application startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logger.info("🚀 Starting BUDDY 2.0 Backend...")
+    
+    # Initialize MongoDB
+    if USE_MONGODB:
+        await init_database()
+        logger.info("✅ MongoDB initialized")
+    
+    # Initialize Firebase
+    if FIREBASE_AVAILABLE:
+        try:
+            await update_buddy_online_status()
+            logger.info("✅ Firebase initialized - BUDDY is now ONLINE")
+        except Exception as e:
+            logger.error(f"❌ Firebase initialization failed: {e}")
+    
+    logger.info("🎯 BUDDY 2.0 Backend ready to serve!")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    logger.info("🛑 Shutting down BUDDY 2.0 Backend...")
+    
+    # Set offline status in Firebase
+    if FIREBASE_AVAILABLE:
+        try:
+            await update_buddy_offline_status()
+            logger.info("✅ Firebase status updated - BUDDY is now OFFLINE")
+        except Exception as e:
+            logger.error(f"❌ Firebase shutdown error: {e}")
+    
+    logger.info("👋 BUDDY 2.0 Backend shutdown complete")
 
 # Pydantic models
 class ChatMessage(BaseModel):
@@ -187,6 +243,62 @@ async def health_check(db: Optional[BuddyDatabase] = Depends(get_db)):
     
     return health_data
 
+@app.get("/config")
+async def get_frontend_config():
+    """Get configuration for Firebase frontend"""
+    render_url = os.getenv("RENDER_EXTERNAL_URL", "https://buddy-2-0.onrender.com")
+    
+    config = {
+        "api_url": render_url,
+        "backend_status": "online",
+        "version": "2.0",
+        "features": {
+            "mongodb": USE_MONGODB,
+            "firebase": FIREBASE_AVAILABLE,
+            "voice_processing": True,
+            "cross_device_sync": True,
+            "vector_memory": os.getenv("USE_VECTOR_MEMORY", "1") == "1"
+        },
+        "endpoints": {
+            "chat": f"{render_url}/chat",
+            "health": f"{render_url}/health",
+            "status": f"{render_url}/status",
+            "voice": f"{render_url}/voice/status"
+        },
+        "firebase_config": {
+            "project_id": "buddyai-42493",
+            "database_url": "https://buddyai-42493-default-rtdb.firebaseio.com"
+        }
+    }
+    
+    return config
+
+@app.get("/status")
+async def get_buddy_status():
+    """Get BUDDY's current status for frontend"""
+    status_data = {
+        "status": "online",
+        "timestamp": datetime.now().isoformat(),
+        "backend_url": os.getenv("RENDER_EXTERNAL_URL", "https://buddy-2-0.onrender.com"),
+        "version": "2.0",
+        "uptime_seconds": (datetime.now() - server_start_time).total_seconds(),
+        "services": {
+            "mongodb": USE_MONGODB,
+            "firebase": FIREBASE_AVAILABLE,
+            "vector_memory": os.getenv("USE_VECTOR_MEMORY", "1") == "1"
+        }
+    }
+    
+    # Update Firebase status if available
+    if FIREBASE_AVAILABLE:
+        try:
+            firebase_manager = await get_firebase_manager()
+            await firebase_manager.set_buddy_status("online", status_data)
+        except Exception as e:
+            logger.error(f"Failed to update Firebase status: {e}")
+    
+    return status_data
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage, background_tasks: BackgroundTasks, db: Optional[BuddyDatabase] = Depends(get_db)):
     """Handle chat messages with MongoDB persistence."""
@@ -246,6 +358,20 @@ async def chat(message: ChatMessage, background_tasks: BackgroundTasks, db: Opti
                 "timestamp": datetime.now().isoformat(),
                 "user_id": user_id
             })
+        
+        # Log conversation to Firebase for cross-device sync
+        if FIREBASE_AVAILABLE:
+            try:
+                conversation_data = {
+                    "message": message.message,
+                    "response": response_text,
+                    "device_type": message.context.get("device_type", "web"),
+                    "session_id": session_id,
+                    "metadata": message.context
+                }
+                background_tasks.add_task(log_conversation_to_firebase, user_id, conversation_data)
+            except Exception as e:
+                logger.error(f"Failed to log to Firebase: {e}")
         
         return ChatResponse(
             response=response_text,
