@@ -46,6 +46,18 @@ class BuddyStatusBridge:
                 logger.info("Using Firebase service account file")
             else:
                 # Use environment variables (production deployment)
+                logger.info("Firebase service account file not found, trying environment variables...")
+                
+                # Debug: Check what environment variables we have
+                firebase_env_vars = {
+                    "FIREBASE_PROJECT_ID": os.getenv("FIREBASE_PROJECT_ID"),
+                    "FIREBASE_PRIVATE_KEY_ID": os.getenv("FIREBASE_PRIVATE_KEY_ID"), 
+                    "FIREBASE_CLIENT_EMAIL": os.getenv("FIREBASE_CLIENT_EMAIL"),
+                    "FIREBASE_CLIENT_ID": os.getenv("FIREBASE_CLIENT_ID"),
+                    "FIREBASE_PRIVATE_KEY": "***" if os.getenv("FIREBASE_PRIVATE_KEY") else None
+                }
+                logger.info(f"Available Firebase env vars: {firebase_env_vars}")
+                
                 firebase_config = {
                     "type": "service_account",
                     "project_id": os.getenv("FIREBASE_PROJECT_ID", "buddyai-42493"),
@@ -62,10 +74,15 @@ class BuddyStatusBridge:
                 
                 # Check if we have the required environment variables
                 if firebase_config["private_key_id"] and firebase_config["private_key"] and firebase_config["client_email"]:
+                    logger.info("✅ All required Firebase environment variables found")
                     cred = credentials.Certificate(firebase_config)
                     logger.info("Using Firebase credentials from environment variables")
                 else:
-                    logger.warning("Firebase credentials not found in environment variables")
+                    missing_vars = []
+                    if not firebase_config["private_key_id"]: missing_vars.append("FIREBASE_PRIVATE_KEY_ID")
+                    if not firebase_config["private_key"]: missing_vars.append("FIREBASE_PRIVATE_KEY") 
+                    if not firebase_config["client_email"]: missing_vars.append("FIREBASE_CLIENT_EMAIL")
+                    logger.warning(f"❌ Missing Firebase environment variables: {missing_vars}")
                     return False
             
             if not cred:

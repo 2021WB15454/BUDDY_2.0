@@ -522,6 +522,40 @@ async def update_preferences(prefs: UserPreferences, db: Optional[BuddyDatabase]
         logger.error(f"Error updating preferences: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/force-firebase-update")
+async def force_firebase_update():
+    """Manually trigger Firebase status update."""
+    try:
+        from firebase_status_bridge import status_bridge
+        
+        # Try to initialize and update Firebase
+        await status_bridge.initialize_firebase()
+        
+        render_url = os.getenv("RENDER_EXTERNAL_URL", "https://buddy-2-0.onrender.com")
+        success = await status_bridge.set_buddy_online(render_url)
+        
+        if success:
+            return {
+                "success": True, 
+                "message": "Firebase status updated successfully",
+                "backend_url": render_url,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Firebase update failed - check logs for details",
+                "backend_url": render_url
+            }
+            
+    except Exception as e:
+        logger.error(f"Error forcing Firebase update: {e}")
+        return {
+            "success": False,
+            "message": f"Firebase update error: {str(e)}",
+            "error_type": type(e).__name__
+        }
+
 @app.get("/analytics/skills")
 async def get_skills_analytics(days: int = 30, db: Optional[BuddyDatabase] = Depends(get_db)):
     """Get skills usage analytics."""
