@@ -22,14 +22,13 @@ import hashlib
 import json
 from dataclasses import dataclass, asdict
 
-# Import dependencies (install with: pip install pinecone-client sentence-transformers)
+# Import dependencies (install with: pip install pinecone sentence-transformers)
 try:
-    import pinecone
     from pinecone import Pinecone, ServerlessSpec
     PINECONE_AVAILABLE = True
 except ImportError:
     PINECONE_AVAILABLE = False
-    print("⚠️ Pinecone not available. Install with: pip install pinecone-client")
+    print("⚠️ Pinecone not available. Install with: pip install pinecone")
 
 try:
     from sentence_transformers import SentenceTransformer

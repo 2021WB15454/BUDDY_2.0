@@ -35,7 +35,8 @@ except ImportError:
 # Import Advanced Intent Classifier (Phase 1 implementation)
 try:
     from buddy_core.nlp.advanced_intent_classifier import get_advanced_intent_classifier
-    from buddy_core.memory.semantic_memory import get_semantic_memory_engine
+    # Temporarily use minimal semantic memory to avoid Pinecone conflicts
+    from minimal_semantic_memory import get_semantic_memory_engine
     PHASE1_ADVANCED_AI_AVAILABLE = True
 except ImportError:
     PHASE1_ADVANCED_AI_AVAILABLE = False

@@ -14,7 +14,7 @@ safetensors>=0.4.0
 
 # Vector database alternatives
 faiss-cpu>=1.7.4
-pinecone-client>=2.2.4
+pinecone>=3.0.0
 
 # NLP utilities
 spacy>=3.7.0
