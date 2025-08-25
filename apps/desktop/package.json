@@ -1,0 +1,116 @@
+{
+  "name": "buddy-desktop",
+  "version": "0.1.0",
+  "description": "BUDDY Desktop - Your JARVIS-style Personal AI Assistant",
+  "main": "src/main.js",
+  "homepage": "./",
+  "private": true,
+  "author": {
+    "name": "BUDDY Team",
+    "email": "team@buddy-ai.dev"
+  },
+  "license": "MIT",
+  "scripts": {
+  "dev": "concurrently -k -n BACKEND,WEB,APP \"npm run dev:backend\" \"npm run dev:web\" \"npm run dev:electron\"",
+  "dev:backend": "cd ../.. && python simple_backend.py",
+  "dev:web": "react-scripts start",
+  "dev:electron": "wait-on http://localhost:8081 http://localhost:3000 && electron . --dev",
+  "dev:electron:web": "wait-on http://localhost:3000 && electron . --dev",
+  "dev:nobackend": "concurrently -k -n WEB,APP \"npm run dev:web\" \"npm run dev:electron:web\"",
+    "build": "npm run build:renderer && npm run build:backend",
+    "build:renderer": "react-scripts build",
+    "build:backend": "cd ../../packages/core && python -m pip install -r requirements.txt",
+    "build:electron": "electron-builder",
+    "pack": "electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "start": "electron .",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "lint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix"
+  },
+  "dependencies": {
+    "electron-log": "^5.0.1",
+    "electron-updater": "^6.1.7",
+    "axios": "^1.6.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.0",
+    "lucide-react": "^0.294.0",
+    "framer-motion": "^10.16.16",
+    "tailwindcss": "^3.3.6"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0",
+    "react-scripts": "5.0.1",
+    "typescript": "^4.9.5",
+    "@types/node": "^20.10.4",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "eslint": "^8.55.0",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32"
+  },
+  "build": {
+    "appId": "com.buddy.desktop",
+    "productName": "BUDDY",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "src/main.js",
+      "src/preload.js",
+      "assets/**/*",
+      "!src/renderer/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../packages/core",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!**/__pycache__",
+          "!**/node_modules"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": true,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

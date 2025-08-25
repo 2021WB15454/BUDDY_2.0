@@ -1,0 +1,19 @@
+{
+  "name": "buddy_2.0",
+  "version": "1.0.0",
+  "description": "This is a **complete, production-ready implementation** of BUDDY - your privacy-first, offline-capable, voice+text personal AI assistant. The system includes all major components with working implementations ready for deployment and further development.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^37.3.1"
+  },
+  "dependencies": {
+    "axios": "^1.11.0"
+  }
+}

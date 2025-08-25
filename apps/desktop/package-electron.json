@@ -1,0 +1,223 @@
+{
+  "name": "buddy-ai-desktop",
+  "version": "1.0.0",
+  "description": "BUDDY AI Assistant - Desktop Application",
+  "main": "src/main.js",
+  "homepage": "./",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "electron": "electron .",
+    "electron-dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron-pack": "electron-builder",
+    "preelectron-pack": "npm run build",
+    "dist": "npm run build && electron-builder",
+    "dist-win": "npm run build && electron-builder --win",
+    "dist-mac": "npm run build && electron-builder --mac",
+    "dist-linux": "npm run build && electron-builder --linux",
+    "pack": "electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.buddy.ai.desktop",
+    "productName": "BUDDY AI Assistant",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "src/main.js",
+      "src/preload.js",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.icns",
+      "darkModeSupport": true,
+      "gatekeeperAssess": false,
+      "hardenedRuntime": true,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "publisherName": "BUDDY AI Team",
+      "verifyUpdateCodeSignature": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "rpm",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "tar.gz",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Office",
+      "desktop": {
+        "Name": "BUDDY AI Assistant",
+        "Comment": "Advanced AI Assistant with Conversation Management",
+        "Keywords": "AI;Assistant;Chat;Voice;Productivity;",
+        "StartupWMClass": "buddy-ai-desktop"
+      }
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/installer.ico",
+      "uninstallerIcon": "assets/uninstaller.ico",
+      "installerHeaderIcon": "assets/installer.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "BUDDY AI Assistant",
+      "include": "assets/installer.nsh"
+    },
+    "dmg": {
+      "title": "BUDDY AI Assistant",
+      "icon": "assets/icon.icns",
+      "iconSize": 100,
+      "contents": [
+        {
+          "x": 380,
+          "y": 280,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 110,
+          "y": 280,
+          "type": "file"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "snap": {
+      "summary": "BUDDY AI Assistant",
+      "description": "Advanced AI Assistant with Enhanced Conversation Management",
+      "grade": "stable",
+      "confinement": "strict",
+      "base": "core20",
+      "plugs": [
+        "desktop",
+        "desktop-legacy", 
+        "wayland",
+        "x11",
+        "unity7",
+        "browser-support",
+        "network",
+        "gsettings",
+        "audio-playback",
+        "audio-record",
+        "camera",
+        "removable-media",
+        "home"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "buddy-ai",
+        "repo": "buddy"
+      }
+    ]
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "electron": "^25.0.0",
+    "electron-is-dev": "^2.0.0",
+    "electron-updater": "^6.1.0",
+    "axios": "^1.4.0",
+    "socket.io-client": "^4.7.0",
+    "react-router-dom": "^6.14.0",
+    "styled-components": "^6.0.0",
+    "framer-motion": "^10.12.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "react-speech-recognition": "^3.10.0",
+    "regenerator-runtime": "^0.13.11"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "wait-on": "^7.0.1",
+    "electron-builder": "^24.4.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/node": "^20.3.0",
+    "typescript": "^5.1.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/buddy-ai/buddy.git"
+  },
+  "keywords": [
+    "ai",
+    "assistant",
+    "electron",
+    "desktop",
+    "chat",
+    "voice",
+    "productivity"
+  ],
+  "author": "BUDDY AI Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/buddy-ai/buddy/issues"
+  }
+}

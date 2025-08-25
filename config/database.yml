@@ -1,0 +1,62 @@
+# MongoDB Configuration for BUDDY
+
+mongodb:
+  # Connection string (for MongoDB Atlas or advanced configurations)
+  connection_string: null
+  
+  # OR Individual connection settings (used if connection_string is null)
+  host: localhost
+  port: 27017
+  database: buddy_ai
+  
+  # Authentication (optional)
+  username: null
+  password: null
+  auth_source: admin
+  
+  # Connection pool settings
+  connection_pool_size: 10
+  timeout_ms: 5000
+  
+  # Write concern settings
+  retry_writes: true
+  journal: true
+  
+  # SSL settings (for production)
+  ssl: false
+  ssl_cert_file: null
+  ssl_ca_file: null
+  
+  # Replica set settings (for production)
+  replica_set: null
+  
+# Development settings
+development:
+  mongodb:
+    host: localhost
+    port: 27017
+    database: buddy_ai_dev
+    
+# Testing settings  
+testing:
+  mongodb:
+    host: localhost
+    port: 27017
+    database: buddy_ai_test
+    
+# Production settings
+production:
+  mongodb:
+    # MongoDB Atlas connection string
+    connection_string: ${MONGODB_CONNECTION_STRING}
+    database: ${MONGODB_DATABASE:buddy_ai}
+    connection_pool_size: 20
+    timeout_ms: 10000
+
+# Atlas configuration (cloud MongoDB)
+atlas:
+  mongodb:
+    connection_string: "mongodb+srv://BUDDY_AI:Preetty%4020@cluster0.fbbl9jd.mongodb.net/"
+    database: buddy_ai
+    connection_pool_size: 15
+    timeout_ms: 8000

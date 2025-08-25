@@ -1,0 +1,70 @@
+# BUDDY Development Configuration
+# This configuration is used when running BUDDY in development mode
+
+# Server Configuration
+server:
+  host: "localhost"
+  port: 8081
+  debug: true
+  reload: true
+
+# Voice Settings
+voice:
+  wake_word_enabled: false  # Disabled for development
+  wake_word_model: "hey_buddy"
+  asr_model: "whisper_base"
+  tts_voice: "default"
+  audio_sample_rate: 16000
+
+# Natural Language Understanding
+nlu:
+  model: "lightweight"
+  confidence_threshold: 0.7
+  max_entities: 10
+
+# Dialogue Management
+dialogue:
+  session_timeout_minutes: 30
+  max_conversation_history: 100
+  confirmation_required_for: 
+    - "delete"
+    - "send"
+    - "purchase"
+
+# Skills Configuration
+skills:
+  auto_discover: true
+  skill_directories:
+    - "./skills"
+    - "./custom_skills"
+  default_timeout_ms: 5000
+
+# Cross-Device Sync
+sync:
+  enabled: false  # Disabled for development
+  encryption: true
+  discovery_timeout: 30
+
+# Privacy Settings
+privacy:
+  local_only: true  # Development mode - keep everything local
+  data_retention_days: 7  # Shorter retention for dev
+  anonymous_telemetry: false
+
+# Performance Settings
+performance:
+  max_concurrent_sessions: 5  # Lower for development
+  cleanup_interval_minutes: 15
+
+# Logging Configuration
+logging:
+  level: "DEBUG"
+  file: "logs/buddy_dev.log"
+  console: true
+
+# Development Features
+development:
+  auto_reload: true
+  mock_external_apis: true
+  test_data_enabled: true
+  verbose_logging: true

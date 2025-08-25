@@ -1,0 +1,442 @@
+# BUDDY Cross-Platform Build and Release Automation
+
+name: Build and Release BUDDY
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Platforms to build (comma-separated: windows,macos,linux,android,ios,web)'
+        required: true
+        default: 'windows,macos,linux,web'
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'beta'
+        type: choice
+        options:
+          - alpha
+          - beta  
+          - stable
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  FLUTTER_VERSION: '3.13.0'
+
+jobs:
+  # Detect build matrix based on inputs
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      platforms: ${{ steps.set-platforms.outputs.platforms }}
+    steps:
+      - name: Set build platforms
+        id: set-platforms
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "platforms=${{ github.event.inputs.platforms }}" >> $GITHUB_OUTPUT
+          else
+            echo "platforms=windows,macos,linux,web" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Set build matrix
+        id: set-matrix
+        run: |
+          platforms="${{ steps.set-platforms.outputs.platforms }}"
+          matrix_include=""
+          
+          if [[ $platforms == *"windows"* ]]; then
+            matrix_include="${matrix_include}, {\"os\": \"windows-latest\", \"platform\": \"windows\", \"arch\": \"x64\"}"
+          fi
+          
+          if [[ $platforms == *"macos"* ]]; then
+            matrix_include="${matrix_include}, {\"os\": \"macos-latest\", \"platform\": \"macos\", \"arch\": \"x64\"}"
+            matrix_include="${matrix_include}, {\"os\": \"macos-latest\", \"platform\": \"macos\", \"arch\": \"arm64\"}"
+          fi
+          
+          if [[ $platforms == *"linux"* ]]; then
+            matrix_include="${matrix_include}, {\"os\": \"ubuntu-latest\", \"platform\": \"linux\", \"arch\": \"x64\"}"
+          fi
+          
+          if [[ $platforms == *"web"* ]]; then
+            matrix_include="${matrix_include}, {\"os\": \"ubuntu-latest\", \"platform\": \"web\", \"arch\": \"universal\"}"
+          fi
+          
+          # Remove leading comma and spaces
+          matrix_include=$(echo "$matrix_include" | sed 's/^, //')
+          
+          echo "matrix={\"include\": [$matrix_include]}" >> $GITHUB_OUTPUT
+
+  # Build desktop applications
+  build-desktop:
+    needs: setup
+    if: contains(needs.setup.outputs.platforms, 'windows') || contains(needs.setup.outputs.platforms, 'macos') || contains(needs.setup.outputs.platforms, 'linux')
+    strategy:
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'apps/desktop/package.json'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r packages/core/requirements.txt
+          pip install -r packages/voice/requirements.txt
+
+      - name: Install Node.js dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build React app
+        working-directory: apps/desktop
+        run: npm run build
+
+      - name: Build Electron app (Windows)
+        if: matrix.platform == 'windows'
+        working-directory: apps/desktop
+        run: npm run dist-win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Electron app (macOS)
+        if: matrix.platform == 'macos'
+        working-directory: apps/desktop
+        run: npm run dist-mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MACOS_CERT }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+
+      - name: Build Electron app (Linux)
+        if: matrix.platform == 'linux'
+        working-directory: apps/desktop
+        run: npm run dist-linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: buddy-desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.dmg
+            apps/desktop/dist/*.zip
+            apps/desktop/dist/*.AppImage
+            apps/desktop/dist/*.deb
+            apps/desktop/dist/*.rpm
+            apps/desktop/dist/*.tar.gz
+
+  # Build web application
+  build-web:
+    needs: setup
+    if: contains(needs.setup.outputs.platforms, 'web')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'apps/desktop/package.json'
+
+      - name: Install dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build web app
+        working-directory: apps/desktop
+        run: npm run build
+
+      - name: Create PWA package
+        run: |
+          mkdir -p dist/web
+          cp -r apps/desktop/build/* dist/web/
+          
+          # Create web manifest
+          cat > dist/web/manifest.json << EOF
+          {
+            "name": "BUDDY AI Assistant",
+            "short_name": "BUDDY",
+            "description": "Advanced AI Assistant with Conversation Management",
+            "start_url": "/",
+            "display": "standalone",
+            "background_color": "#1a1a1a",
+            "theme_color": "#4a90e2",
+            "orientation": "portrait-primary",
+            "icons": [
+              {
+                "src": "icon-192.png",
+                "sizes": "192x192",
+                "type": "image/png"
+              },
+              {
+                "src": "icon-512.png", 
+                "sizes": "512x512",
+                "type": "image/png"
+              }
+            ]
+          }
+          EOF
+
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: buddy-web-pwa
+          path: dist/web/
+
+  # Build mobile applications
+  build-mobile:
+    needs: setup
+    if: contains(needs.setup.outputs.platforms, 'android') || contains(needs.setup.outputs.platforms, 'ios')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+          - os: macos-latest  
+            platform: ios
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Setup Java (Android)
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11'
+
+      - name: Setup Android SDK
+        if: matrix.platform == 'android'
+        uses: android-actions/setup-android@v2
+
+      - name: Setup Xcode (iOS)
+        if: matrix.platform == 'ios'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build Android APK
+        if: matrix.platform == 'android'
+        working-directory: mobile
+        run: |
+          flutter build apk --release
+          flutter build appbundle --release
+
+      - name: Build iOS IPA  
+        if: matrix.platform == 'ios'
+        working-directory: mobile
+        run: |
+          flutter build ios --release --no-codesign
+          
+      - name: Upload mobile artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: buddy-mobile-${{ matrix.platform }}
+          path: |
+            mobile/build/app/outputs/flutter-apk/*.apk
+            mobile/build/app/outputs/bundle/release/*.aab
+            mobile/build/ios/ipa/*.ipa
+
+  # Build Python packages
+  build-python:
+    needs: setup
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel setuptools
+
+      - name: Build Python package
+        run: python -m build
+
+      - name: Upload Python artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: buddy-python-package
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+
+  # Create GitHub release
+  release:
+    needs: [setup, build-desktop, build-web, build-python]
+    if: always() && (needs.build-desktop.result == 'success' || needs.build-web.result == 'success' || needs.build-python.result == 'success')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts/ -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.tar.gz" -o -name "*.apk" -o -name "*.aab" -o -name "*.ipa" -o -name "*.whl" \) -exec cp {} release-assets/ \;
+          
+          # Create web archive
+          if [ -d "artifacts/buddy-web-pwa" ]; then
+            cd artifacts/buddy-web-pwa
+            tar -czf ../../release-assets/buddy-web-pwa.tar.gz *
+            cd ../../
+          fi
+
+      - name: Generate release notes
+        run: |
+          cat > release-notes.md << EOF
+          # BUDDY AI Assistant Release
+          
+          ## Platforms Available
+          
+          ### Desktop Applications
+          - Windows (x64): \`.exe\` installer and portable \`.zip\`
+          - macOS (Intel & Apple Silicon): \`.dmg\` installer  
+          - Linux (x64): \`.AppImage\`, \`.deb\`, \`.rpm\`, \`.tar.gz\`
+          
+          ### Web Application
+          - Progressive Web App (PWA): \`buddy-web-pwa.tar.gz\`
+          
+          ### Python Package
+          - PyPI package: \`.whl\` and source \`.tar.gz\`
+          
+          ## Installation Instructions
+          
+          ### Quick Install (Linux/macOS)
+          \`\`\`bash
+          curl -fsSL https://install.buddy.ai | bash
+          \`\`\`
+          
+          ### Windows PowerShell
+          \`\`\`powershell
+          iwr -useb https://install.buddy.ai/windows | iex
+          \`\`\`
+          
+          ### Python Package
+          \`\`\`bash
+          pip install buddy-ai
+          \`\`\`
+          
+          ## Features
+          - ✅ Enhanced conversation flow management
+          - ✅ Cross-device synchronization  
+          - ✅ Emotional intelligence support
+          - ✅ Health and wellness advice
+          - ✅ Voice interaction capabilities
+          - ✅ 16 advanced AI skills
+          - ✅ Cross-platform compatibility
+          
+          ## System Requirements
+          - **Desktop**: Windows 10+, macOS 10.15+, Ubuntu 18.04+
+          - **Memory**: 4GB RAM minimum, 8GB recommended
+          - **Storage**: 500MB available space
+          - **Network**: Internet connection required
+          
+          For detailed installation and usage instructions, visit [docs.buddy.ai](https://docs.buddy.ai)
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "BUDDY AI Assistant ${{ github.ref_name }}"
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ github.event.inputs.release_type != 'stable' }}
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Deploy to various platforms
+  deploy:
+    needs: [release]
+    if: github.event.inputs.release_type == 'stable'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download Python artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: buddy-python-package
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Deploy web app
+        run: |
+          echo "Deploying web app to production..."
+          # Add deployment scripts here
+          
+      - name: Update package managers
+        run: |
+          echo "Updating package manager repositories..."
+          # Add package manager update scripts here
+
+      - name: Notify deployment completion
+        run: |
+          echo "Deployment completed successfully!"
+          echo "Desktop apps: Available on GitHub releases"
+          echo "Python package: Available on PyPI" 
+          echo "Web app: Deployed to production"

@@ -1,0 +1,23 @@
+{
+  "user_name": "Shrihari",
+  "preferences": {},
+  "frequent_intents": {
+    "greeting": 14,
+    "who_am_i": 4,
+    "who_are_you": 4,
+    "time": 2,
+    "system_status": 3,
+    "calculate": 1,
+    "productivity": 1,
+    "how_i_work": 1,
+    "status_how_are_you": 1,
+    "knowledge_query": 2,
+    "date": 1
+  },
+  "topics": [
+    "time",
+    "weather",
+    "technology",
+    "math"
+  ]
+}
