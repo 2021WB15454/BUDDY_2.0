@@ -1,0 +1,74 @@
+# Pinecone Configuration for BUDDY AI Assistant
+
+# Pinecone API Configuration
+pinecone:
+  # API Key (can also be set via PINECONE_API_KEY environment variable)
+  api_key: "${PINECONE_API_KEY}"
+  
+  # Index Configuration
+  index_name: "buddy-memory"
+  cloud: "aws"
+  region: "us-east-1"
+  
+  # Embedding Model Configuration
+  embedding_model: "all-MiniLM-L6-v2"
+  
+  # Search Configuration
+  default_top_k: 5
+  min_similarity_score: 0.6
+  
+  # Memory Settings
+  auto_store_conversations: true
+  memory_retention_days: 365  # How long to keep memories (0 = forever)
+  
+  # Knowledge Base Settings
+  knowledge_categories:
+    - "general"
+    - "technology" 
+    - "science"
+    - "history"
+    - "personal"
+    - "work"
+    - "health"
+    - "travel"
+
+# Memory Skill Configuration
+memory_skill:
+  enabled: true
+  auto_initialize: true
+  
+  # Conversation Memory Settings
+  store_user_messages: true
+  store_assistant_responses: true
+  min_message_length: 10  # Minimum characters to store
+  
+  # Knowledge Management
+  allow_user_knowledge_addition: true
+  knowledge_approval_required: false
+  
+  # Search Settings
+  semantic_search_enabled: true
+  fuzzy_matching: true
+  
+  # Privacy Settings
+  anonymize_personal_data: false
+  encrypt_sensitive_data: false
+
+# Integration Settings
+integration:
+  # Other services that can use memory
+  services:
+    - "dialogue_manager"
+    - "nlu_service"
+    - "knowledge_service"
+  
+  # Events to trigger memory storage
+  trigger_events:
+    - "conversation_end"
+    - "user_explicit_request"
+    - "important_information_detected"
+  
+  # Memory Context Injection
+  inject_memory_context: true
+  max_context_memories: 3
+  context_relevance_threshold: 0.7

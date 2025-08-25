@@ -1,0 +1,44 @@
+[
+  {
+    "timestamp": "2025-08-25T23:30:39.739834",
+    "user_id": "default",
+    "session_id": null,
+    "user_message": "System status",
+    "response": "I understand you're saying: System status\n\nBased on our previous conversations, I can provide more personalized help.\n\nIs there something specific I can help you with?"
+  },
+  {
+    "timestamp": "2025-08-25T23:41:28.244315",
+    "user_id": "default",
+    "session_id": null,
+    "user_message": "how are you",
+    "response": "I understand you're saying: how are you\n\nBased on our previous conversations, I can provide more personalized help.\n\nIs there something specific I can help you with?"
+  },
+  {
+    "timestamp": "2025-08-25T23:41:50.869034",
+    "user_id": "default",
+    "session_id": null,
+    "user_message": "what is the weather",
+    "response": "The current weather in San Francisco is 22°C with Pleasant. Humidity is at 65%."
+  },
+  {
+    "timestamp": "2025-08-25T23:42:12.576148",
+    "user_id": "default",
+    "session_id": null,
+    "user_message": "in trichy",
+    "response": "I understand you're saying: in trichy\n\nBased on our previous conversations, I can provide more personalized help.\n\nIs there something specific I can help you with?"
+  },
+  {
+    "timestamp": "2025-08-26T01:11:08.615456",
+    "user_id": "integration_test_user",
+    "session_id": "integration_test_session",
+    "user_message": "Hello BUDDY! Test the MongoDB and Pinecone integration.",
+    "response": "Hello! I'm BUDDY, your AI assistant. How can I help you today? I remember our previous conversations."
+  },
+  {
+    "timestamp": "2025-08-26T01:12:31.570615",
+    "user_id": "integration_test_user",
+    "session_id": "integration_test_session",
+    "user_message": "Hello BUDDY! Test the MongoDB and Pinecone integration.",
+    "response": "Hello! I'm BUDDY, your AI assistant. How can I help you today? I remember our previous conversations."
+  }
+]

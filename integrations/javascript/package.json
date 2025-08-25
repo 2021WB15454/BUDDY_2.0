@@ -1,0 +1,42 @@
+{
+  "name": "buddy-ai-sdk",
+  "version": "2.0.0",
+  "description": "JavaScript SDK for BUDDY AI Assistant integration",
+  "main": "buddy-sdk.js",
+  "scripts": {
+    "test": "node examples.js",
+    "demo": "node examples.js",
+    "docs": "echo 'Visit http://localhost:8081/docs for API documentation'"
+  },
+  "keywords": [
+    "ai",
+    "assistant",
+    "chatbot",
+    "buddy",
+    "sdk",
+    "javascript",
+    "api"
+  ],
+  "author": "BUDDY AI Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/2021WB15454/BUDDY_2.0.git"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "peerDependencies": {
+    "fetch": ">=3.0.0"
+  },
+  "files": [
+    "buddy-sdk.js",
+    "examples.js",
+    "README.md"
+  ],
+  "browser": {
+    "buddy-sdk.js": "./buddy-sdk.js"
+  }
+}

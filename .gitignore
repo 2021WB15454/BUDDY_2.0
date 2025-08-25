@@ -105,5 +105,12 @@ troubleshoot_*.py
 *.crt
 *.cert
 
+# Firebase and Push Notification Credentials
+config/firebase-service-account.json
+config/*.p8
+config/*.p12
+config/apns-*
+keys/
+
 # Documentation builds
 docs/_build/

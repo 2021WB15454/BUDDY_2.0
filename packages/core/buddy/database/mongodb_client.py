@@ -34,7 +34,7 @@ class MongoDBClient:
         self.collections: Dict[str, AsyncIOMotorCollection] = {}
         self.is_connected = False
         self._connection_pool_size = self.config.get('connection_pool_size', 10)
-        self._timeout = self.config.get('timeout_ms', 5000)
+        self._timeout = self.config.get('timeout_ms', 10000)  # Increased to 10s for Atlas
         
     def _load_default_config(self) -> Dict[str, Any]:
         """Load default MongoDB configuration."""
@@ -76,7 +76,7 @@ class MongoDBClient:
             'password': os.getenv('MONGODB_PASSWORD'),
             'auth_source': os.getenv('MONGODB_AUTH_SOURCE', 'admin'),
             'connection_pool_size': 10,
-            'timeout_ms': 5000,
+            'timeout_ms': 10000,  # Increased for MongoDB Atlas
             'retry_writes': True,
             'journal': True
         }

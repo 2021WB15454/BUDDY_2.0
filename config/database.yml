@@ -60,3 +60,12 @@ atlas:
     database: buddy_ai
     connection_pool_size: 15
     timeout_ms: 8000
+
+# Atlas SQL configuration (MongoDB Atlas SQL Interface)
+atlas-sql:
+  mongodb:
+    connection_string: "mongodb://atlas-sql-68aba56a4c5c21750aab7a74-uid0wq.a.query.mongodb.net/buddy_ai?ssl=true&authSource=admin"
+    database: buddy_ai
+    connection_pool_size: 15
+    timeout_ms: 8000
+    ssl: true

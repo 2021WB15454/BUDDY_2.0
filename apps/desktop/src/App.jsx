@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import './styles/App.css';
 import './styles/enhanced.css';
 
+// Firebase imports
+import { buddyMessaging } from './firebase';
+import FirebaseNotificationSetup from './components/FirebaseNotificationSetup';
+
 // Simple fallback components to avoid import errors
 const Sidebar = ({ currentView, onViewChange, connectionStatus }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -755,6 +759,25 @@ const SettingsPanel = () => {
         </div>
 
         <div className="settings-section">
+          <h4>� Notifications</h4>
+          <div className="setting-item">
+            <label className="setting-label">
+              <input 
+                type="checkbox" 
+                checked={settings.notifications}
+                onChange={(e) => handleSettingChange('notifications', e.target.checked)}
+              />
+              <span className="checkmark"></span>
+              Enable notifications
+            </label>
+          </div>
+          <div className="setting-item">
+            <label className="setting-label">Push Notifications Setup:</label>
+            <FirebaseNotificationSetup onTokenReceived={handleTokenReceived} />
+          </div>
+        </div>
+
+        <div className="settings-section">
           <h4>🖥️ System</h4>
           <div className="setting-item">
             <label className="setting-label">
@@ -765,17 +788,6 @@ const SettingsPanel = () => {
               />
               <span className="checkmark"></span>
               Auto-start with system
-            </label>
-          </div>
-          <div className="setting-item">
-            <label className="setting-label">
-              <input 
-                type="checkbox" 
-                checked={settings.notifications}
-                onChange={(e) => handleSettingChange('notifications', e.target.checked)}
-              />
-              <span className="checkmark"></span>
-              Enable notifications
             </label>
           </div>
           <div className="setting-item">
@@ -899,13 +911,42 @@ function App() {
   const [currentView, setCurrentView] = useState('chat');
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [skills, setSkills] = useState([]);
+  const [fcmToken, setFcmToken] = useState(null);
+
+  // Firebase messaging setup
+  useEffect(() => {
+    // Initialize Firebase messaging
+    const initFirebaseMessaging = async () => {
+      try {
+        // Setup foreground message handler
+        buddyMessaging.setupForegroundMessageHandler();
+        
+        // Request permission and get token (optional - can be done via UI)
+        const savedToken = localStorage.getItem('buddy_fcm_token');
+        if (savedToken) {
+          setFcmToken(savedToken);
+        }
+      } catch (error) {
+        console.error('Firebase messaging setup failed:', error);
+      }
+    };
+
+    initFirebaseMessaging();
+  }, []);
+
+  // Handle FCM token received
+  const handleTokenReceived = (token) => {
+    setFcmToken(token);
+    localStorage.setItem('buddy_fcm_token', token);
+    console.log('FCM token stored:', token);
+  };
 
   // Test backend connection
   useEffect(() => {
     const testConnection = async () => {
       try {
         if (window.electronAPI) {
-          // Test backend connection
+          // Electron environment - use IPC
           const response = await window.electronAPI.invoke('backend:request', {
             method: 'GET',
             endpoint: '/health'
@@ -936,6 +977,41 @@ function App() {
           } else {
             setConnectionStatus('disconnected');
           }
+        } else {
+          // Web environment - use HTTP
+          const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8082';
+          
+          // Test health endpoint
+          const healthResponse = await fetch(`${backendUrl}/health`);
+          if (!healthResponse.ok) {
+            throw new Error(`Health check failed: ${healthResponse.status}`);
+          }
+          
+          const healthData = await healthResponse.json();
+          console.log('Backend health check (HTTP):', healthData);
+          
+          if (healthData.status === 'healthy') {
+            setConnectionStatus('connected');
+            
+            // Load skills
+            const skillsResponse = await fetch(`${backendUrl}/skills`);
+            if (skillsResponse.ok) {
+              const skillsData = await skillsResponse.json();
+              console.log('Skills response (HTTP):', skillsData);
+              
+              // Extract skills array safely
+              let skills = [];
+              if (skillsData.skills && Array.isArray(skillsData.skills)) {
+                skills = skillsData.skills;
+              } else if (Array.isArray(skillsData)) {
+                skills = skillsData;
+              }
+              
+              setSkills(skills);
+            }
+          } else {
+            setConnectionStatus('disconnected');
+          }
         }
       } catch (error) {
         console.error('Connection test failed:', error);
@@ -950,8 +1026,9 @@ function App() {
 
   const handleSendMessage = async (message) => {
     try {
+      // Check if running in Electron environment
       if (window.electronAPI) {
-        console.log('Sending message to backend:', message);
+        console.log('Sending message to backend via Electron:', message);
         const response = await window.electronAPI.invoke('backend:request', {
           method: 'POST',
           endpoint: '/chat',
@@ -974,11 +1051,50 @@ function App() {
         console.error('Backend error:', errorText, response?.details || '');
         return { response: 'I had trouble reaching the backend. Please try again.' };
       } else {
-        throw new Error('Electron API not available');
+        // Web environment - make direct HTTP request
+        console.log('Sending message to backend via HTTP:', message);
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8082';
+        
+        const response = await fetch(`${backendUrl}/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: message,
+            context: {}
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Backend HTTP response:', data);
+        
+        if (data && typeof data.response === 'string') {
+          return { response: data.response };
+        } else {
+          console.error('Unexpected backend response format:', data);
+          return { response: 'Sorry, I received an unexpected response from the server.' };
+        }
       }
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Surface a friendly message instead of throwing to avoid duplicate bubbles
+      
+      // Provide more specific error messages for web environment
+      if (!window.electronAPI) {
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          return { response: 'Cannot connect to BUDDY backend. Please ensure the backend server is running on port 8082.' };
+        } else if (error.message.includes('HTTP')) {
+          return { response: `Backend server error: ${error.message}. Please check the server status.` };
+        } else {
+          return { response: 'A technical error occurred. Please ensure the backend is running on port 8082 and try again.' };
+        }
+      }
+      
+      // Electron environment error
       return { response: 'A technical error occurred. Ensure the backend is running on port 8082 and try again.' };
     }
   };

@@ -82,6 +82,74 @@
       .app-loaded .loading-screen {
         display: none;
       }
+
+      /* Firebase notifications */
+      .notifications-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        max-width: 400px;
+      }
+
+      .buddy-notification {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        margin-bottom: 10px;
+        padding: 16px;
+        border-left: 4px solid #4A90E2;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      .buddy-notification-content h4 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+      }
+
+      .buddy-notification-content p {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        color: #666;
+        line-height: 1.4;
+      }
+
+      .buddy-notification-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .buddy-notification-actions button {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .buddy-notification-actions .dismiss {
+        background: #f5f5f5;
+        color: #666;
+      }
+
+      .buddy-notification-actions .dismiss:hover {
+        background: #e0e0e0;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
     </style>
   </head>
   <body>
@@ -96,6 +164,9 @@
     
     <!-- React app root -->
     <div id="root"></div>
+    
+    <!-- Firebase notification container -->
+    <div id="buddy-notifications" class="notifications-container"></div>
 
     <script>
       // Hide loading screen when window loads

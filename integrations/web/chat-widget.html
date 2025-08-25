@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUDDY AI Chat Widget</title>
+    <style>
+        /* BUDDY Chat Widget Styles */
+        .buddy-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .buddy-toggle {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 15px 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .buddy-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .buddy-chat {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            width: 350px;
+            height: 500px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .buddy-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .buddy-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .buddy-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            transition: background 0.3s ease;
+        }
+
+        .buddy-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .buddy-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .buddy-message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            animation: slideIn 0.3s ease;
+        }
+
+        .buddy-message.user {
+            justify-content: flex-end;
+        }
+
+        .buddy-message-content {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .buddy-message.user .buddy-message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .buddy-message.buddy .buddy-message-content {
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-bottom-left-radius: 4px;
+            color: #333;
+        }
+
+        .buddy-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            margin: 0 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .buddy-message.user .buddy-avatar {
+            background: #667eea;
+            color: white;
+        }
+
+        .buddy-message.buddy .buddy-avatar {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .buddy-input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e1e5e9;
+            display: flex;
+            gap: 10px;
+        }
+
+        .buddy-input {
+            flex: 1;
+            border: 1px solid #e1e5e9;
+            border-radius: 25px;
+            padding: 12px 20px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .buddy-input:focus {
+            border-color: #667eea;
+        }
+
+        .buddy-send {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .buddy-send:hover {
+            transform: scale(1.05);
+        }
+
+        .buddy-send:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .buddy-typing {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            max-width: 80%;
+        }
+
+        .buddy-typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .buddy-typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #999;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .buddy-typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .buddy-typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        .buddy-skills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .buddy-skill {
+            background: #f0f0f0;
+            color: #666;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .buddy-skill:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .buddy-chat {
+                position: fixed;
+                bottom: 0;
+                right: 0;
+                left: 0;
+                width: 100%;
+                height: 100vh;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Your existing website content goes here -->
+    <div style="padding: 50px; text-align: center;">
+        <h1>Your Website</h1>
+        <p>This is your existing website content. The BUDDY chat widget is embedded below.</p>
+        <p>Click the chat button in the bottom-right corner to start talking with BUDDY!</p>
+    </div>
+
+    <!-- BUDDY Chat Widget -->
+    <div class="buddy-widget" id="buddyWidget">
+        <!-- Toggle Button -->
+        <button class="buddy-toggle" id="buddyToggle">
+            💬 Chat with BUDDY
+        </button>
+
+        <!-- Chat Interface -->
+        <div class="buddy-chat" id="buddyChat" style="display: none;">
+            <!-- Header -->
+            <div class="buddy-header">
+                <h3>🤖 BUDDY AI Assistant</h3>
+                <button class="buddy-close" id="buddyClose">×</button>
+            </div>
+
+            <!-- Messages -->
+            <div class="buddy-messages" id="buddyMessages">
+                <div class="buddy-message buddy">
+                    <div class="buddy-avatar">🤖</div>
+                    <div class="buddy-message-content">
+                        Hello! I'm BUDDY, your AI assistant. How can I help you today?
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="buddy-input-area">
+                <input 
+                    type="text" 
+                    class="buddy-input" 
+                    id="buddyInput" 
+                    placeholder="Type your message..."
+                    maxlength="500"
+                >
+                <button class="buddy-send" id="buddySend">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BUDDY SDK -->
+    <script src="../javascript/buddy-sdk.js"></script>
+
+    <script>
+        class BuddyChatWidget {
+            constructor() {
+                this.buddy = new BuddyClient({
+                    baseUrl: 'http://localhost:8081',
+                    onError: (error) => this.showError(error)
+                });
+                
+                this.elements = {
+                    widget: document.getElementById('buddyWidget'),
+                    toggle: document.getElementById('buddyToggle'),
+                    chat: document.getElementById('buddyChat'),
+                    close: document.getElementById('buddyClose'),
+                    messages: document.getElementById('buddyMessages'),
+                    input: document.getElementById('buddyInput'),
+                    send: document.getElementById('buddySend')
+                };
+                
+                this.isOpen = false;
+                this.isLoading = false;
+                
+                this.initializeEvents();
+                this.loadQuickActions();
+            }
+
+            initializeEvents() {
+                // Toggle chat
+                this.elements.toggle.addEventListener('click', () => this.openChat());
+                this.elements.close.addEventListener('click', () => this.closeChat());
+
+                // Send message
+                this.elements.send.addEventListener('click', () => this.sendMessage());
+                this.elements.input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                // Auto-resize input
+                this.elements.input.addEventListener('input', () => {
+                    this.elements.send.disabled = !this.elements.input.value.trim();
+                });
+            }
+
+            openChat() {
+                this.elements.chat.style.display = 'flex';
+                this.elements.toggle.style.display = 'none';
+                this.isOpen = true;
+                this.elements.input.focus();
+            }
+
+            closeChat() {
+                this.elements.chat.style.display = 'none';
+                this.elements.toggle.style.display = 'block';
+                this.isOpen = false;
+            }
+
+            async sendMessage() {
+                const message = this.elements.input.value.trim();
+                if (!message || this.isLoading) return;
+
+                // Add user message
+                this.addMessage(message, 'user');
+                this.elements.input.value = '';
+                this.elements.send.disabled = true;
+                
+                // Show typing indicator
+                this.showTyping();
+                this.isLoading = true;
+
+                try {
+                    // Send to BUDDY
+                    const response = await this.buddy.chat(message);
+                    
+                    // Remove typing indicator and add response
+                    this.hideTyping();
+                    this.addMessage(response.response, 'buddy');
+                    
+                    // Show confidence if low
+                    if (response.confidence < 0.7) {
+                        this.addMessage(
+                            `I'm not entirely sure about that (${Math.round(response.confidence * 100)}% confidence). Would you like me to clarify or try a different approach?`,
+                            'buddy',
+                            true
+                        );
+                    }
+
+                } catch (error) {
+                    this.hideTyping();
+                    this.showError(error);
+                } finally {
+                    this.isLoading = false;
+                    this.elements.send.disabled = false;
+                }
+            }
+
+            addMessage(content, sender, isSystem = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `buddy-message ${sender}`;
+                
+                const avatar = document.createElement('div');
+                avatar.className = 'buddy-avatar';
+                avatar.textContent = sender === 'user' ? '👤' : '🤖';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'buddy-message-content';
+                contentDiv.textContent = content;
+                
+                if (isSystem) {
+                    contentDiv.style.opacity = '0.8';
+                    contentDiv.style.fontStyle = 'italic';
+                }
+
+                if (sender === 'user') {
+                    messageDiv.appendChild(contentDiv);
+                    messageDiv.appendChild(avatar);
+                } else {
+                    messageDiv.appendChild(avatar);
+                    messageDiv.appendChild(contentDiv);
+                }
+
+                this.elements.messages.appendChild(messageDiv);
+                this.scrollToBottom();
+            }
+
+            showTyping() {
+                const typingDiv = document.createElement('div');
+                typingDiv.id = 'buddyTyping';
+                typingDiv.className = 'buddy-message buddy';
+                
+                typingDiv.innerHTML = `
+                    <div class="buddy-avatar">🤖</div>
+                    <div class="buddy-typing">
+                        <div class="buddy-typing-dots">
+                            <div class="buddy-typing-dot"></div>
+                            <div class="buddy-typing-dot"></div>
+                            <div class="buddy-typing-dot"></div>
+                        </div>
+                    </div>
+                `;
+                
+                this.elements.messages.appendChild(typingDiv);
+                this.scrollToBottom();
+            }
+
+            hideTyping() {
+                const typing = document.getElementById('buddyTyping');
+                if (typing) {
+                    typing.remove();
+                }
+            }
+
+            showError(error) {
+                this.addMessage(
+                    `Sorry, I encountered an error: ${error.message}. Please try again.`,
+                    'buddy',
+                    true
+                );
+            }
+
+            scrollToBottom() {
+                this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
+            }
+
+            async loadQuickActions() {
+                try {
+                    const skills = await this.buddy.getSkills();
+                    this.addQuickActions(skills.slice(0, 5)); // Show first 5 skills
+                } catch (error) {
+                    console.warn('Could not load quick actions:', error);
+                }
+            }
+
+            addQuickActions(skills) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'buddy-message buddy';
+                
+                const avatar = document.createElement('div');
+                avatar.className = 'buddy-avatar';
+                avatar.textContent = '🤖';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'buddy-message-content';
+                contentDiv.innerHTML = `
+                    <div>Here are some things I can help you with:</div>
+                    <div class="buddy-skills">
+                        ${skills.map(skill => 
+                            `<span class="buddy-skill" onclick="buddyWidget.quickAction('${skill.name}')">${skill.name}</span>`
+                        ).join('')}
+                    </div>
+                `;
+                
+                actionsDiv.appendChild(avatar);
+                actionsDiv.appendChild(contentDiv);
+                this.elements.messages.appendChild(actionsDiv);
+                this.scrollToBottom();
+            }
+
+            async quickAction(skillName) {
+                const messages = {
+                    'time': 'What time is it?',
+                    'weather': 'What\'s the weather like?',
+                    'calculate': 'Can you help me with math?',
+                    'help': 'What can you help me with?',
+                    'greeting': 'Hello!'
+                };
+                
+                const message = messages[skillName] || `Help me with ${skillName}`;
+                this.elements.input.value = message;
+                this.sendMessage();
+            }
+        }
+
+        // Initialize the widget when the page loads
+        let buddyWidget;
+        document.addEventListener('DOMContentLoaded', () => {
+            buddyWidget = new BuddyChatWidget();
+        });
+
+        // Handle keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Alt + C to toggle chat
+            if (e.altKey && e.key === 'c') {
+                e.preventDefault();
+                if (buddyWidget.isOpen) {
+                    buddyWidget.closeChat();
+                } else {
+                    buddyWidget.openChat();
+                }
+            }
+            
+            // Escape to close chat
+            if (e.key === 'Escape' && buddyWidget.isOpen) {
+                buddyWidget.closeChat();
+            }
+        });
+    </script>
+</body>
+</html>

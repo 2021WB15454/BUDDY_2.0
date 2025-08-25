@@ -163,21 +163,17 @@ class SkillRegistry:
         self.schemas: Dict[str, SkillSchema] = {}
         self.categories: Dict[str, List[str]] = {}
         self.permission_grants: Dict[str, List[str]] = {}  # user_id -> permissions
+        self._registration_lock = asyncio.Lock()  # Prevent concurrent registrations
+        self._builtin_skills_loaded = False  # Track if builtin skills are loaded
+        
         # Subscribe to skill execution requests
         self.event_bus.subscribe("skill.execute", self._handle_skill_execution)
         self.event_bus.subscribe("skill.list", self._handle_skill_list_request)
+        
         logger.info("Skill registry initialized")
+        
         # Register built-in skills during initialization
         asyncio.create_task(self._initialize_builtin_skills())
-
-    def get_skill(self, skill_name: str) -> Optional[BaseSkill]:
-        """Return the skill instance by name, or None if not found."""
-        return self.skills.get(skill_name)
-        self.event_bus = event_bus or get_event_bus()
-        self.skills: Dict[str, BaseSkill] = {}
-        self.schemas: Dict[str, SkillSchema] = {}
-        self.categories: Dict[str, List[str]] = {}
-        self.permission_grants: Dict[str, List[str]] = {}  # user_id -> permissions
         
         # Subscribe to skill execution requests
         self.event_bus.subscribe("skill.execute", self._handle_skill_execution)
@@ -197,7 +193,7 @@ class SkillRegistry:
         if schema.name in self.schemas:
             existing_version = self.schemas[schema.name].version
             if existing_version == schema.version:
-                logger.warning(f"Skill {schema.name} v{schema.version} already registered")
+                logger.info(f"Skill {schema.name} v{schema.version} already registered – skipping")
                 return False
         return True
 
@@ -226,8 +222,41 @@ class SkillRegistry:
         
     async def register_builtin_skills(self):
         """Register a comprehensive set of built-in skills including advanced AI capabilities."""
+        async with self._registration_lock:
+            if self._builtin_skills_loaded:
+                logger.info("Built-in skills already loaded – skipping")
+                return
+                
+            # Mark as loading to prevent duplicates
+            self._builtin_skills_loaded = True
         # Core skills
         core_skills = [TimeSkill, RemindersSkill, FallbackSkill, GreetingSkill, WeatherSkill, CalculatorSkill, HelpSkill]
+        
+        # Try to import memory skill
+        try:
+            import sys
+            from pathlib import Path
+            
+            # Try different import strategies for memory skill
+            try:
+                from .skills.memory import MemorySkill
+                core_skills.append(MemorySkill)
+                logger.info("Memory skill imported successfully")
+            except ImportError:
+                try:
+                    # Add the skills directory to Python path
+                    skills_dir = Path(__file__).parent / "skills"
+                    sys.path.insert(0, str(skills_dir))
+                    
+                    from memory import MemorySkill
+                    core_skills.append(MemorySkill)
+                    logger.info("Memory skill imported successfully")
+                except ImportError as e:
+                    logger.warning(f"Memory skill dependencies not available: {e}")
+        except Exception as e:
+            logger.warning(f"Memory skill not available: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to import memory skill: {e}")
         
         # Advanced skills
         try:
@@ -299,17 +328,18 @@ class SkillRegistry:
                 self.categories[schema.category] = []
             self.categories[schema.category].append(schema.name)
             
-            # Publish registration event
-            await self.event_bus.publish(
-                "skill.registered",
-                {
-                    "skill_name": schema.name,
-                    "version": schema.version,
-                    "category": schema.category,
-                    "permissions": schema.permissions
-                },
-                source="skill_registry"
-            )
+            # Publish registration event (only if event bus is running)
+            if hasattr(self.event_bus, 'is_running') and self.event_bus.is_running:
+                await self.event_bus.publish(
+                    "skill.registered",
+                    {
+                        "skill_name": schema.name,
+                        "version": schema.version,
+                        "category": schema.category,
+                        "permissions": schema.permissions
+                    },
+                    source="skill_registry"
+                )
             
             logger.info(f"Registered skill: {schema.name} v{schema.version}")
             return True
@@ -349,12 +379,13 @@ class SkillRegistry:
                 if not self.categories[schema.category]:
                     del self.categories[schema.category]
                     
-            # Publish unregistration event
-            await self.event_bus.publish(
-                "skill.unregistered",
-                {"skill_name": skill_name},
-                source="skill_registry"
-            )
+            # Publish unregistration event (only if event bus is running)
+            if hasattr(self.event_bus, 'is_running') and self.event_bus.is_running:
+                await self.event_bus.publish(
+                    "skill.unregistered",
+                    {"skill_name": skill_name},
+                    source="skill_registry"
+                )
             
             logger.info(f"Unregistered skill: {skill_name}")
             return True
@@ -429,11 +460,12 @@ class SkillRegistry:
             execution_time = int((datetime.now() - start_time).total_seconds() * 1000)
             result.execution_time_ms = execution_time
             
-            # Publish execution result
-            await self.event_bus.publish(
-                "skill.result",
-                {
-                    "skill_name": skill_name,
+            # Publish execution result (only if event bus is running)
+            if hasattr(self.event_bus, 'is_running') and self.event_bus.is_running:
+                await self.event_bus.publish(
+                    "skill.result",
+                    {
+                        "skill_name": skill_name,
                     "session_id": context.get("session_id"),
                     "turn_id": context.get("turn_id"),
                     "success": result.success,
@@ -480,9 +512,11 @@ class SkillRegistry:
             category = payload.get("category")
             device_id = payload.get("device_id")
             skills = self.list_skills(category=category, device_id=device_id)
-            await self.event_bus.publish(
-                "skill.list_response",
-                {"skills": skills, "request_id": payload.get("request_id")},
+            # Publish list response (only if event bus is running)
+            if hasattr(self.event_bus, 'is_running') and self.event_bus.is_running:
+                await self.event_bus.publish(
+                    "skill.list_response",
+                    {"skills": skills, "request_id": payload.get("request_id")},
                 source="skill_registry"
             )
         except Exception as e:

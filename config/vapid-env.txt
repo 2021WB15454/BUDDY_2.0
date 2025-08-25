@@ -1,0 +1,3 @@
+# Add these to your .env file:
+FIREBASE_VAPID_PUBLIC_KEY=BD9JGBvmYzR2GYE6CB6lYFkzHV9D0hhLVce2Swy4E48vglT01dG5a7FO9XnBSgHgrjn8c5_ZkM553tn9zqjg8y0
+FIREBASE_VAPID_PRIVATE_KEY_PATH=./config/vapid-private-key.pem

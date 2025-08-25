@@ -8,10 +8,29 @@ command-line arguments, configuration loading, and graceful shutdown.
 import asyncio
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 import yaml
 import json
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Try to load .env file from project root
+    env_path = Path(__file__).parent.parent.parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+        logging.getLogger(__name__).info(f"Loaded environment from {env_path}")
+    else:
+        # Try alternative locations
+        for alt_path in [Path('.env'), Path('config/.env')]:
+            if alt_path.exists():
+                load_dotenv(alt_path)
+                logging.getLogger(__name__).info(f"Loaded environment from {alt_path}")
+                break
+except ImportError:
+    logging.getLogger(__name__).warning("python-dotenv not installed, skipping .env file loading")
 
 from .runtime import BuddyRuntime
 
@@ -106,15 +125,19 @@ def parse_arguments():
 
 
 async def start_api_server(runtime: BuddyRuntime, host: str, port: int):
-    """Start the REST API server."""
+    """Start the REST API server with authentication."""
     try:
-        from fastapi import FastAPI, HTTPException
+        from fastapi import FastAPI, HTTPException, Depends, Request
         from fastapi.middleware.cors import CORSMiddleware
+        from fastapi.security import HTTPBearer
         import uvicorn
+        
+        # Import authentication system
+        from .auth import initialize_buddy_auth, create_auth_routes, BuddyAuthMiddleware
         
         app = FastAPI(
             title="BUDDY API",
-            description="REST API for BUDDY Personal AI Assistant",
+            description="REST API for BUDDY Personal AI Assistant with JWT Authentication",
             version="0.1.0"
         )
         
@@ -127,9 +150,51 @@ async def start_api_server(runtime: BuddyRuntime, host: str, port: int):
             allow_headers=["*"],
         )
         
+        # Initialize authentication system
+        jwt_secret = os.getenv("BUDDY_JWT_SECRET", "dev-secret-key-buddy-2024-development")
+        auth_enabled = os.getenv("API_AUTHENTICATION_ENABLED", "false").lower() == "true"
+        
+        if auth_enabled:
+            try:
+                # Get MongoDB client from runtime
+                mongo_client = runtime.database.client
+                auth_manager, auth_api = await initialize_buddy_auth(mongo_client, jwt_secret)
+                
+                # Add authentication middleware
+                app.middleware("http")(BuddyAuthMiddleware(auth_api))
+                
+                # Create authentication routes
+                create_auth_routes(app, auth_api)
+                
+                logging.info("Authentication system initialized and enabled")
+                
+                # Protected endpoint dependency
+                async def get_current_user(claims: dict = Depends(auth_api.verify_token)):
+                    return claims
+                
+            except Exception as e:
+                logging.error(f"Failed to initialize authentication: {e}")
+                auth_enabled = False
+                auth_api = None
+        else:
+            auth_api = None
+            logging.info("Authentication disabled for development")
+        
         @app.get("/")
         async def root():
-            return {"message": "BUDDY API Server", "version": "0.1.0"}
+            return {
+                "message": "BUDDY API Server", 
+                "version": "0.1.0",
+                "authentication_enabled": auth_enabled,
+                "endpoints": {
+                    "health": "/health",
+                    "status": "/status", 
+                    "metrics": "/metrics",
+                    "chat": "/chat",
+                    "skills": "/skills",
+                    "auth": "/auth/*" if auth_enabled else "disabled"
+                }
+            }
         
         @app.get("/health")
         async def health():
@@ -143,18 +208,36 @@ async def start_api_server(runtime: BuddyRuntime, host: str, port: int):
         async def get_metrics():
             return runtime.get_metrics()
         
-        @app.post("/chat")
-        async def chat(request: dict):
-            text = request.get("text") or request.get("message", "")
-            user_id = request.get("user_id", "default")
-            device_id = request.get("device_id", "api")
-            context = request.get("context", {})
-            
-            if not text:
-                raise HTTPException(status_code=400, detail="Text is required")
-            
-            result = await runtime.process_user_input(text, user_id, device_id, context)
-            return result
+        # Chat endpoint with optional authentication
+        if auth_enabled:
+            @app.post("/chat")
+            async def chat(request: dict, user_claims: dict = Depends(get_current_user)):
+                text = request.get("text") or request.get("message", "")
+                user_id = user_claims.get("sub", "authenticated_user")
+                device_id = user_claims.get("device_id", "api")
+                context = request.get("context", {})
+                context["authenticated"] = True
+                context["device_type"] = user_claims.get("device_type")
+                
+                if not text:
+                    raise HTTPException(status_code=400, detail="Text is required")
+                
+                result = await runtime.process_user_input(text, user_id, device_id, context)
+                return result
+        else:
+            @app.post("/chat")
+            async def chat(request: dict):
+                text = request.get("text") or request.get("message", "")
+                user_id = request.get("user_id", "default")
+                device_id = request.get("device_id", "api")
+                context = request.get("context", {})
+                context["authenticated"] = False
+                
+                if not text:
+                    raise HTTPException(status_code=400, detail="Text is required")
+                
+                result = await runtime.process_user_input(text, user_id, device_id, context)
+                return result
         
         @app.get("/skills")
         async def get_skills():
@@ -168,15 +251,41 @@ async def start_api_server(runtime: BuddyRuntime, host: str, port: int):
                 raise HTTPException(status_code=404, detail="Skill not found")
             return schema.to_dict()
         
+        # Cross-device sync endpoints (protected if auth enabled)
+        if auth_enabled:
+            @app.post("/sync/push")
+            async def sync_push(data: dict, user_claims: dict = Depends(get_current_user)):
+                """Push data for cross-device sync"""
+                # TODO: Implement cross-device sync
+                return {"status": "pushed", "user_id": user_claims["sub"]}
+            
+            @app.get("/sync/pull")
+            async def sync_pull(user_claims: dict = Depends(get_current_user)):
+                """Pull data for cross-device sync"""
+                # TODO: Implement cross-device sync
+                return {"status": "pulled", "user_id": user_claims["sub"], "data": []}
+        
+        # Development endpoints (only if auth disabled)
+        if not auth_enabled:
+            @app.post("/dev/login")
+            async def dev_login(request: dict):
+                """Development login endpoint (no auth required)"""
+                return {
+                    "message": "Development mode - authentication disabled",
+                    "user_id": request.get("user_id", "dev_user"),
+                    "device_id": request.get("device_id", "dev_device")
+                }
+        
         # Start server
         config = uvicorn.Config(app, host=host, port=port, log_level="info")
         server = uvicorn.Server(config)
         
         logging.info(f"Starting API server on {host}:{port}")
+        logging.info(f"Authentication: {'Enabled' if auth_enabled else 'Disabled (Development Mode)'}")
         await server.serve()
         
-    except ImportError:
-        logging.error("FastAPI and uvicorn are required for API server. Install with: pip install fastapi uvicorn")
+    except ImportError as e:
+        logging.error(f"FastAPI and uvicorn are required for API server. Install with: pip install fastapi uvicorn. Error: {e}")
         sys.exit(1)
 
 
@@ -202,12 +311,9 @@ async def main():
     # Create runtime
     runtime = BuddyRuntime(config)
     try:
+        logger.info("Initializing BUDDY runtime...")
         await runtime.start()
-        # Ensure minimal built-in skills are registered for immediate usefulness
-        try:
-            await runtime.skill_registry.register_builtin_skills()
-        except Exception as e:
-            logging.getLogger(__name__).warning(f"Failed to register builtin skills: {e}")
+        logger.info("BUDDY initialization complete")
         
         # Start API server if requested
         if args.api_only:

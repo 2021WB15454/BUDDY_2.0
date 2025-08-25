@@ -143,10 +143,10 @@ class BuddyRuntime:
             if self.database:
                 try:
                     await self.database.connect()
-                    logger.info("✅ Database connected successfully")
+                    logger.info("Database connected successfully")
                 except Exception as e:
-                    logger.warning(f"⚠️ Database connection failed: {e}")
-                    logger.info("🔄 BUDDY will continue without database persistence")
+                    logger.warning(f"Database connection failed: {e}")
+                    logger.info("BUDDY will continue without database persistence")
                     self.database = None
             
             # Start core components
