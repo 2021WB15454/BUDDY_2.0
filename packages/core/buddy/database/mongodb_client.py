@@ -331,6 +331,23 @@ class MongoDBClient:
         """Get skill analytics collection."""
         return self.collections['skill_analytics']
     
+    def get_collection(self, collection_name: str) -> AsyncIOMotorCollection:
+        """
+        Get a collection by name.
+        
+        Args:
+            collection_name: Name of the collection to retrieve
+            
+        Returns:
+            AsyncIOMotorCollection: The requested collection
+            
+        Raises:
+            KeyError: If collection doesn't exist
+        """
+        if collection_name not in self.collections:
+            raise KeyError(f"Collection '{collection_name}' not found. Available collections: {list(self.collections.keys())}")
+        return self.collections[collection_name]
+    
     # Database operations
     async def create_document(self, collection_name: str, document: Dict[str, Any]) -> str:
         """
