@@ -311,7 +311,7 @@
     <script>
         class BuddyWebInterface {
             constructor() {
-                this.apiUrl = 'http://localhost:8082';
+                this.apiUrl = this.getApiUrl();
                 this.chatMessages = document.getElementById('chatMessages');
                 this.messageInput = document.getElementById('messageInput');
                 this.sendButton = document.getElementById('sendButton');
@@ -319,6 +319,13 @@
                 this.connectionStatus = document.getElementById('connectionStatus');
                 
                 this.init();
+            }
+
+            getApiUrl() {
+                // Try to get from environment-like config or fallback
+                const host = window.BUDDY_HOST || 'localhost';
+                const port = window.BUDDY_PORT || '8082';
+                return `http://${host}:${port}`;
             }
 
             init() {

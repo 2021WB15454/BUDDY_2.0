@@ -42,4 +42,7 @@ async def chat(message: ChatMessage):
         raise
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8082, log_level="info")
+    import os
+    host = os.getenv("BUDDY_HOST", "localhost")
+    port = int(os.getenv("BUDDY_PORT", "8082"))
+    uvicorn.run(app, host=host, port=port, log_level="info")

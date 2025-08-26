@@ -979,7 +979,7 @@ function App() {
           }
         } else {
           // Web environment - use HTTP
-          const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8082';
+          const backendUrl = process.env.REACT_APP_BACKEND_URL || `http://${process.env.REACT_APP_BUDDY_HOST || 'localhost'}:${process.env.REACT_APP_BUDDY_PORT || '8082'}`;
           
           // Test health endpoint
           const healthResponse = await fetch(`${backendUrl}/health`);

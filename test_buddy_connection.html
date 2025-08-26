@@ -76,7 +76,7 @@
         <div id="details" style="margin-top: 20px; font-size: 12px;">
             <h3>Connection Details:</h3>
             <ul>
-                <li>Backend API: http://localhost:8082</li>
+                <li>Backend API: <span id="backend-url">Loading...</span></li>
                 <li>Web Server: http://localhost:3000</li>
                 <li>Database: MongoDB Atlas</li>
             </ul>
@@ -84,7 +84,17 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:8082';
+        // Get dynamic API URL based on environment variables or defaults
+        function getApiUrl() {
+            const host = window.BUDDY_HOST || 'localhost';
+            const port = window.BUDDY_PORT || '8082';
+            return `http://${host}:${port}`;
+        }
+        
+        const API_URL = getApiUrl();
+        
+        // Update the backend URL display
+        document.getElementById('backend-url').textContent = API_URL;
         
         async function updateStatus(message, type = 'info') {
             const status = document.getElementById('status');

@@ -1,0 +1,25 @@
+name: buddy_mobile_flutter
+description: Flutter variant scaffold for BUDDY Mobile 2.0
+version: 0.1.0
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  websocket_universal: ^1.5.5
+  web_socket_channel: ^2.4.0
+  provider: ^6.0.5
+  speech_to_text: ^6.6.0
+  flutter_tts: ^3.8.5
+  tflite_flutter: ^0.10.4
+  tflite_flutter_helper: ^0.4.3
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^3.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/models/intent_classifier.tflite
+    - assets/models/entity_extractor.tflite

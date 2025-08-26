@@ -1,0 +1,12 @@
+# Placeholder TFLite model file  
+# This is a placeholder file. Replace with actual TensorFlow Lite model.
+#
+# To generate real models:
+# 1. Install TensorFlow: pip install tensorflow
+# 2. Run: python generate_tflite_models.py  
+# 3. Or provide your own trained TFLite models
+#
+# Model specifications:
+# - Input: Tokenized text sequences (max 50 tokens)
+# - Output: Entity labels per token (10 entity types)
+# - Format: TensorFlow Lite (.tflite)

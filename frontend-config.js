@@ -6,9 +6,6 @@ const BACKEND_CONFIG = {
   // Production Render URL (update when deployed)
   RENDER_API_URL: "https://buddy-2-0.onrender.com",
   
-  // Local development URL
-  LOCAL_API_URL: "http://localhost:8082",
-  
   // Get the appropriate API URL based on environment
   getApiUrl() {
     // Check if we're in production (Firebase hosting)
@@ -16,8 +13,10 @@ const BACKEND_CONFIG = {
         window.location.hostname.includes('web.app')) {
       return this.RENDER_API_URL;
     }
-    // Local development
-    return this.LOCAL_API_URL;
+    // Local development - use dynamic configuration
+    const host = window.BUDDY_HOST || 'localhost';
+    const port = window.BUDDY_PORT || '8082';
+    return `http://${host}:${port}`;
   }
 };
 

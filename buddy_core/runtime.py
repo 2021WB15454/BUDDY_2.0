@@ -38,6 +38,7 @@ import logging
 import signal
 import sys
 import time
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 import json
@@ -122,7 +123,7 @@ class BuddyCore:
             },
             'sync': {
                 'enabled': True,
-                'discovery_port': 8083,
+                'discovery_port': int(os.getenv('BUDDY_SYNC_PORT', '8083')),
                 'sync_interval': 60,  # 1 minute
                 'encryption': True
             },

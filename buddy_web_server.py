@@ -11,6 +11,7 @@ import threading
 import time
 from urllib.parse import urlparse, parse_qs
 import json
+from dynamic_config import get_host, get_port, get_ws_base
 
 class BuddyWebHandler(http.server.SimpleHTTPRequestHandler):
     """Custom handler for BUDDY web interface with CORS support"""
@@ -47,8 +48,8 @@ def start_web_server(port=3000):
             print(f"🌐 BUDDY Web Interface Server")
             print(f"=" * 40)
             print(f"📡 Server running at: http://localhost:{port}")
-            print(f"🚀 BUDDY API running at: http://localhost:8080")
-            print(f"🔗 Communication Hub: ws://localhost:8082")
+            print(f"🚀 BUDDY API running at: http://{get_host()}:{get_port()}")
+            print(f"🔗 Communication Hub: {get_ws_base()}")
             print(f"=" * 40)
             print(f"✅ Ready! Opening web interface...")
             print(f"🔄 Press Ctrl+C to stop the server")

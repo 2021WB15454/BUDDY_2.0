@@ -28,6 +28,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import websockets
 import aiohttp
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ class BuddyConnector:
                  device_name: str,
                  capabilities: DeviceCapabilities,
                  user_id: str = None,
-                 core_url: str = "ws://localhost:8082",
+                 core_url: str = None,
                  auto_reconnect: bool = True,
                  max_reconnect_attempts: int = 10):
         
@@ -110,6 +111,13 @@ class BuddyConnector:
         self.device_name = device_name
         self.capabilities = capabilities
         self.user_id = user_id
+        
+        # Set default core_url with dynamic configuration
+        if core_url is None:
+            host = os.getenv("BUDDY_HOST", "localhost")
+            port = os.getenv("BUDDY_PORT", "8082")
+            core_url = f"ws://{host}:{port}"
+        
         self.core_url = core_url
         self.auto_reconnect = auto_reconnect
         self.max_reconnect_attempts = max_reconnect_attempts

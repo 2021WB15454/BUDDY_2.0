@@ -4,6 +4,8 @@ Check all components and connections
 """
 
 import requests
+import os
+from dynamic_config import get_host, get_port
 import json
 import time
 from datetime import datetime
@@ -17,7 +19,8 @@ def check_backend():
     
     try:
         # Health check
-        response = requests.get("http://localhost:8082/health", timeout=5)
+    base = f"http://{get_host()}:{get_port()}"
+    response = requests.get(f"{base}/health", timeout=5)
         if response.status_code == 200:
             health_data = response.json()
             print("✅ Backend is running!")
@@ -44,7 +47,7 @@ def check_skills():
     print_separator()
     
     try:
-        response = requests.get("http://localhost:8082/skills", timeout=5)
+    response = requests.get(f"{base}/skills", timeout=5)
         if response.status_code == 200:
             skills_data = response.json()
             skills = skills_data.get('skills', [])
@@ -77,7 +80,7 @@ def check_chat():
         try:
             print(f"Testing: '{message}'")
             
-            response = requests.post("http://localhost:8082/chat", 
+            response = requests.post(f"{base}/chat", 
                 json={
                     "message": message,
                     "user_id": "diagnostic_user",
@@ -113,7 +116,7 @@ def check_web_server():
             print("   Interface accessible at http://localhost:3000")
             
             # Check if HTML contains the fixed API URL
-            if "localhost:8082" in response.text:
+            if f"localhost:{get_port()}" in response.text:
                 print("✅ Web interface configured for correct API endpoint")
             else:
                 print("⚠️  Web interface may have wrong API endpoint")
@@ -164,8 +167,8 @@ def main():
     
     print("\n🔗 Quick Links:")
     print("   🌐 Web Interface: http://localhost:3000")
-    print("   📡 API Backend: http://localhost:8082")
-    print("   📊 Health Check: http://localhost:8082/health")
+    print(f"   📡 API Backend: http://{get_host()}:{get_port()}")
+    print(f"   📊 Health Check: http://{get_host()}:{get_port()}/health")
     print("   🧪 Connection Test: http://localhost:3000/test_buddy_connection.html")
 
 if __name__ == "__main__":

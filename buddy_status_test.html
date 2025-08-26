@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUDDY Status Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+        .status-card {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .offline { background: #f44336; }
+        .offline-card { border-left-color: #f44336; }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #45a049; }
+        .chat-input { 
+            width: 100%; 
+            padding: 10px; 
+            border-radius: 5px; 
+            border: none; 
+            margin: 10px 0; 
+        }
+        .response {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 BUDDY Status Monitor</h1>
+        <p>Live connection test for your BUDDY backend and Firebase integration</p>
+        
+        <div id="backendStatus" class="status-card">
+            <div class="status-indicator">
+                <div id="backendDot" class="status-dot"></div>
+                <strong>Backend Status: <span id="backendText">Checking...</span></strong>
+            </div>
+            <div id="backendDetails">Connecting to https://buddy-2-0.onrender.com</div>
+        </div>
+
+        <div id="firebaseStatus" class="status-card">
+            <div class="status-indicator">
+                <div id="firebaseDot" class="status-dot"></div>
+                <strong>Firebase Status: <span id="firebaseText">Checking...</span></strong>
+            </div>
+            <div id="firebaseDetails">Monitoring realtime database updates</div>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button onclick="testBackend()">🔄 Test Backend</button>
+            <button onclick="testChat()">💬 Test Chat</button>
+            <button onclick="forceFirebaseUpdate()">🔥 Force Firebase Update</button>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Type a message to test BUDDY..." value="Hello BUDDY, are you online?">
+            <button onclick="sendChatMessage()">Send Message</button>
+        </div>
+
+        <div id="response" class="response" style="display: none;"></div>
+        
+        <div style="margin-top: 30px; font-size: 12px; opacity: 0.7;">
+            <p><strong>URLs:</strong></p>
+            <p>Backend: https://buddy-2-0.onrender.com</p>
+            <p>Firebase: https://buddyai-42493-default-rtdb.firebaseio.com</p>
+            <p>Frontend: https://buddyai-42493.web.app</p>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase configuration
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDQ8mHJGME8GGEE9LY-TQKNc1xZAWX6Qx8",
+            authDomain: "buddyai-42493.firebaseapp.com",
+            databaseURL: "https://buddyai-42493-default-rtdb.firebaseio.com",
+            projectId: "buddyai-42493",
+            storageBucket: "buddyai-42493.appspot.com"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // Backend configuration
+        const BACKEND_URL = 'https://buddy-2-0.onrender.com';
+
+        // Test backend connection
+        window.testBackend = async () => {
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const data = await response.json();
+                
+                updateBackendStatus(true, `Healthy - ${data.status}`, JSON.stringify(data, null, 2));
+            } catch (error) {
+                updateBackendStatus(false, 'Connection Failed', error.message);
+            }
+        };
+
+        // Test chat functionality
+        window.testChat = async () => {
+            window.sendChatMessage();
+        };
+
+        // Send chat message
+        window.sendChatMessage = async () => {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            const responseDiv = document.getElementById('response');
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = 'Sending message to BUDDY...';
+
+            try {
+                const response = await fetch(`${BACKEND_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        user_id: 'test_user',
+                        session_id: 'test_session'
+                    })
+                });
+
+                const data = await response.json();
+                responseDiv.textContent = `BUDDY Response:\n${data.response}\n\nFull Response:\n${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}`;
+            }
+        };
+
+        // Force Firebase update
+        window.forceFirebaseUpdate = async () => {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/force-firebase-update`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    alert('Firebase update triggered! Check the Firebase status above.');
+                } else {
+                    alert('Firebase update failed. Check backend logs.');
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        };
+
+        // Update backend status display
+        function updateBackendStatus(isOnline, statusText, details) {
+            const dot = document.getElementById('backendDot');
+            const text = document.getElementById('backendText');
+            const detailsDiv = document.getElementById('backendDetails');
+            const card = document.getElementById('backendStatus');
+
+            if (isOnline) {
+                dot.classList.remove('offline');
+                card.classList.remove('offline-card');
+                text.textContent = `Online - ${statusText}`;
+            } else {
+                dot.classList.add('offline');
+                card.classList.add('offline-card');
+                text.textContent = `Offline - ${statusText}`;
+            }
+            
+            detailsDiv.textContent = details;
+        }
+
+        // Update Firebase status display
+        function updateFirebaseStatus(isOnline, statusText, details) {
+            const dot = document.getElementById('firebaseDot');
+            const text = document.getElementById('firebaseText');
+            const detailsDiv = document.getElementById('firebaseDetails');
+            const card = document.getElementById('firebaseStatus');
+
+            if (isOnline) {
+                dot.classList.remove('offline');
+                card.classList.remove('offline-card');
+                text.textContent = `Connected - ${statusText}`;
+            } else {
+                dot.classList.add('offline');
+                card.classList.add('offline-card');
+                text.textContent = `Disconnected - ${statusText}`;
+            }
+            
+            detailsDiv.textContent = details;
+        }
+
+        // Listen to Firebase status updates
+        const statusRef = ref(database, 'status/buddy');
+        onValue(statusRef, (snapshot) => {
+            const status = snapshot.val();
+            
+            if (status) {
+                const isOnline = status.status === 'online';
+                const lastUpdated = new Date(status.last_updated).toLocaleString();
+                const details = `Last Updated: ${lastUpdated}\nBackend URL: ${status.backend_url || 'Not set'}\nVersion: ${status.version || 'Unknown'}`;
+                
+                updateFirebaseStatus(isOnline, status.status, details);
+                
+                console.log('Firebase status update:', status);
+            } else {
+                updateFirebaseStatus(false, 'No data', 'No status data found in Firebase');
+            }
+        }, (error) => {
+            updateFirebaseStatus(false, 'Connection Error', error.message);
+            console.error('Firebase connection error:', error);
+        });
+
+        // Initial backend test
+        testBackend();
+
+        console.log('BUDDY Status Monitor initialized');
+        console.log('Backend URL:', BACKEND_URL);
+        console.log('Firebase Database URL:', firebaseConfig.databaseURL);
+    </script>
+</body>
+</html>

@@ -9,18 +9,31 @@ import os
 import asyncio
 import httpx
 import logging
+import time
+import hashlib
+from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from difflib import SequenceMatcher
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Header, status, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+from fastapi import UploadFile, File, Form
+from car.middleware.core import AutomotiveMiddlewareCore, MiddlewareConfig
 import json
 from dotenv import load_dotenv
+from fastapi import Query
 
-# Load environment variables
+########################
+# Early initialization  #
+########################
 load_dotenv()
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Import MongoDB integration
 from mongodb_integration import buddy_db, init_database, get_database, BuddyDatabase
@@ -44,11 +57,11 @@ except ImportError:
 # Import Simplified NLP Engine as fallback
 from simplified_nlp_engine import get_simplified_nlp_engine
 
-# Import Firebase integration
+# Import Firebase integration (after logger defined)
 try:
     from firebase_integration import (
-        get_firebase_manager, 
-        update_buddy_online_status, 
+        get_firebase_manager,
+        update_buddy_online_status,
         update_buddy_offline_status,
         log_conversation_to_firebase,
         verify_firebase_user
@@ -56,23 +69,109 @@ try:
     FIREBASE_AVAILABLE = True
 except ImportError:
     FIREBASE_AVAILABLE = False
-    logger.warning("Firebase integration not available")
+    logging.getLogger(__name__).warning("Firebase integration not available")
 
 # Weather API configuration
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "ff2cbe677bbfc325d2b615c86a20daef")
 WEATHER_BASE_URL = "http://api.openweathermap.org/data/2.5"
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# (Logging already configured above)
 
 # Runtime flags
 DEBUG_MODE = os.getenv("BUDDY_DEBUG") == "1"
 DEV_MODE = os.getenv("BUDDY_DEV") == "1"
 USE_MONGODB = os.getenv("USE_MONGODB", "1") == "1"
+ADMIN_API_KEY = os.getenv("BUDDY_ADMIN_API_KEY")
+CLIENT_TOKEN = os.getenv("BUDDY_CLIENT_TOKEN")  # Shared client auth token for REST/WS
+RATE_LIMIT_WINDOW_SEC = int(os.getenv("BUDDY_RATE_LIMIT_WINDOW_SEC", "300"))  # 5 min default
+RATE_LIMIT_MAX = int(os.getenv("BUDDY_RATE_LIMIT_MAX", "60"))  # 60 calls / window
+ENABLE_ADMIN_AUDIT = os.getenv("BUDDY_ENABLE_ADMIN_AUDIT", "1") == "1"
+AUDIT_LOG_PATH = os.getenv("BUDDY_ADMIN_AUDIT_FILE", "logs/admin_audit.log")
+RATE_STATE_FILE = os.getenv("BUDDY_RATE_LIMIT_STATE_FILE", "logs/rate_limit_state.json")
+
+# In-memory rate limit store: { (actor, route): [timestamps] }
+_RATE_BUCKET: Dict[Tuple[str, str], List[float]] = {}
+
+def _load_rate_state():
+    if not RATE_STATE_FILE:
+        return
+    try:
+        p = Path(RATE_STATE_FILE)
+        if not p.exists():
+            return
+        data = json.loads(p.read_text(encoding="utf-8"))
+        now = time.time()
+        for k, ts_list in data.items():
+            # key stored as actor||route
+            if not isinstance(ts_list, list):
+                continue
+            actor, route = k.split("||", 1)
+            # keep only those within window to avoid stale buildup
+            fresh = [t for t in ts_list if now - t < RATE_LIMIT_WINDOW_SEC]
+            if fresh:
+                _RATE_BUCKET[(actor, route)] = fresh
+        logger.info("Loaded rate limit state (%d keys)", len(_RATE_BUCKET))
+    except Exception as e:
+        logger.debug(f"Rate state load failed: {e}")
+
+def _save_rate_state():
+    if not RATE_STATE_FILE:
+        return
+    try:
+        Path(RATE_STATE_FILE).parent.mkdir(parents=True, exist_ok=True)
+        serial: Dict[str, List[float]] = {}
+        for (actor, route), ts_list in _RATE_BUCKET.items():
+            serial[f"{actor}||{route}"] = ts_list
+        Path(RATE_STATE_FILE).write_text(json.dumps(serial), encoding="utf-8")
+    except Exception as e:
+        logger.debug(f"Rate state save failed: {e}")
+
+def _hash_actor(actor: str) -> str:
+    return hashlib.sha256(actor.encode("utf-8")).hexdigest()[:16]
+
+def _extract_client_ip(request: Request) -> str:
+    # Prefer X-Forwarded-For (Render / proxy) then client.host
+    xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
+    if xff:
+        # take first IP
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+def _audit(event: str, actor: str, details: Dict[str, Any]):
+    if not ENABLE_ADMIN_AUDIT:
+        return
+    try:
+        Path(AUDIT_LOG_PATH).parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "event": event,
+            "actor_hash": _hash_actor(actor),
+            **details
+        }
+        with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception as e:
+        logger.debug(f"Audit log write failed: {e}")
+
+def _check_rate_limit(actor: str, route: str):
+    now = time.time()
+    key = (actor, route)
+    bucket = _RATE_BUCKET.setdefault(key, [])
+    # purge old
+    cutoff = now - RATE_LIMIT_WINDOW_SEC
+    while bucket and bucket[0] < cutoff:
+        bucket.pop(0)
+    if len(bucket) >= RATE_LIMIT_MAX:
+        retry_after = int(bucket[0] + RATE_LIMIT_WINDOW_SEC - now)
+        raise HTTPException(status_code=429, detail={
+            "error": "rate_limited",
+            "window_seconds": RATE_LIMIT_WINDOW_SEC,
+            "max": RATE_LIMIT_MAX,
+            "retry_after": max(retry_after, 1)
+        })
+    bucket.append(now)
+    # Persist after mutation (best-effort)
+    _save_rate_state()
 
 def debug_log_intent(intent: str, message: str | None = None):
     if DEBUG_MODE:
@@ -104,6 +203,8 @@ app.add_middleware(
 async def startup_event():
     """Initialize services on startup"""
     logger.info("🚀 Starting BUDDY 2.0 Backend...")
+    # Load persisted rate limit state
+    _load_rate_state()
     
     # Initialize MongoDB
     if USE_MONGODB:
@@ -119,6 +220,26 @@ async def startup_event():
             logger.error(f"❌ Firebase initialization failed: {e}")
     
     logger.info("🎯 BUDDY 2.0 Backend ready to serve!")
+    # Initialize automotive middleware core
+    try:
+        global automotive_core
+        automotive_core = AutomotiveMiddlewareCore(MiddlewareConfig())
+        await automotive_core.initialize()
+        logger.info("🚗 Automotive middleware initialized")
+    except Exception as e:
+        logger.warning(f"Automotive middleware init failed: {e}")
+    # Configure minimal semantic memory (if available)
+    if PHASE1_ADVANCED_AI_AVAILABLE:
+        try:
+            engine = await get_semantic_memory_engine()
+            engine.update_config({
+                "enable_embeddings": True,
+                "chroma_persist_dir": os.getenv("BUDDY_CHROMA_DIR", "./chroma_store"),
+                "max_age_seconds": int(os.getenv("BUDDY_MEMORY_MAX_AGE", "86400"))  # 24h default
+            })
+            logger.info("🧠 Semantic memory configured (embeddings=%s, persist=%s)", engine.enable_embeddings, engine.config.get("chroma_persist_dir"))
+        except Exception as e:
+            logger.warning(f"Semantic memory configuration failed: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -166,6 +287,126 @@ class UserPreferences(BaseModel):
     user_id: str
     preferences: Dict[str, Any]
 
+class SemanticMemoryUpdate(BaseModel):
+    enable_embeddings: Optional[bool] = None
+    chroma_persist_dir: Optional[str] = None
+    max_age_seconds: Optional[int] = None
+
+class CarVoiceMeta(BaseModel):
+    speed_kmh: Optional[float] = 0.0
+    location: Optional[Dict[str, Any]] = None
+    source: Optional[str] = "api"
+
+class CarPluginRegistration(BaseModel):
+    intent_type: str
+    response_text: str = "Acknowledged"
+    spoken_text: Optional[str] = None
+
+def _require_admin(api_key: str | None) -> None:
+    if not ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Admin API key not configured")
+    if not api_key:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing X-Admin-API-Key header")
+    if api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin API key")
+
+@app.post("/admin/semantic-memory/config")
+async def update_semantic_memory_config(update: SemanticMemoryUpdate, api_key: str = Header(None, alias="X-Admin-API-Key"), request: Optional[Request] = None):
+    _require_admin(api_key)
+    _check_rate_limit(api_key, "/admin/semantic-memory/config:POST")
+    if not PHASE1_ADVANCED_AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Semantic memory engine not available")
+    engine = await get_semantic_memory_engine()
+    new_cfg = {k: v for k, v in update.dict().items() if v is not None}
+    client_ip = _extract_client_ip(request) if request else "unknown"
+    if not new_cfg:
+        _audit("semantic_memory_config_noop", api_key, {"path": "/admin/semantic-memory/config", "method": "POST", "ip": client_ip})
+        return {"status": "no_change"}
+    engine.update_config(new_cfg)
+    _audit("semantic_memory_config_update", api_key, {"changes": new_cfg, "ip": client_ip})
+    return {"status": "updated", "config": engine.config}
+
+@app.get("/admin/semantic-memory/config")
+async def get_semantic_memory_config(api_key: str = Header(None, alias="X-Admin-API-Key"), request: Optional[Request] = None):
+    _require_admin(api_key)
+    _check_rate_limit(api_key, "/admin/semantic-memory/config:GET")
+    if not PHASE1_ADVANCED_AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Semantic memory engine not available")
+    engine = await get_semantic_memory_engine()
+    _audit("semantic_memory_config_read", api_key, {"path": "/admin/semantic-memory/config", "ip": _extract_client_ip(request) if request else "unknown"})
+    return {
+        "config": engine.config,
+        "enable_embeddings": engine.enable_embeddings,
+        "use_chroma": engine.use_chroma,
+        "cache_users": len(getattr(engine, 'conversation_cache', {}))
+    }
+
+@app.get("/admin/audit/logs")
+async def get_audit_logs(api_key: str = Header(None, alias="X-Admin-API-Key"), request: Optional[Request] = None, limit: int = 200):
+    _require_admin(api_key)
+    _check_rate_limit(api_key, "/admin/audit/logs:GET")
+    client_ip = _extract_client_ip(request) if request else "unknown"
+    if limit < 1 or limit > 1000:
+        raise HTTPException(status_code=400, detail="Limit must be between 1 and 1000")
+    try:
+        if not ENABLE_ADMIN_AUDIT:
+            raise HTTPException(status_code=503, detail="Audit logging disabled")
+        p = Path(AUDIT_LOG_PATH)
+        if not p.exists():
+            return {"entries": [], "total": 0}
+        # Read last N lines efficiently
+        with p.open("r", encoding="utf-8") as f:
+            lines = f.readlines()[-limit:]
+        entries = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entries.append(json.loads(line))
+            except Exception:
+                continue
+        _audit("audit_log_read", api_key, {"count": len(entries), "ip": client_ip})
+        return {"entries": entries, "returned": len(entries)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to read audit logs: {e}")
+        raise HTTPException(status_code=500, detail="Failed to read audit logs")
+
+
+@app.get("/debug/semantic-memory")
+async def debug_semantic_memory(query: str = Query("hello", description="Query text for similarity test"),
+                                user_id: str = Query("default_user"),
+                                limit: int = Query(5, ge=1, le=25)):
+    """Inspect semantic memory retrieval for a given query.
+
+    Returns the raw matches, scores, and basic cache statistics. Works with the minimal semantic
+    memory engine (and future full engine) as long as it exposes recall_relevant_context.
+    """
+    try:
+        if not PHASE1_ADVANCED_AI_AVAILABLE:
+            raise HTTPException(status_code=503, detail="Semantic memory engine not available")
+        semantic_memory = await get_semantic_memory_engine(conversation_db=None)
+        matches = await semantic_memory.recall_relevant_context(query=query, user_id=user_id, limit=limit)
+        # Basic stats
+        cache_size = len(getattr(semantic_memory, 'conversation_cache', {}).get(user_id, []))
+        engine_type = semantic_memory.__class__.__name__
+        return {
+            'engine': engine_type,
+            'query': query,
+            'user_id': user_id,
+            'limit': limit,
+            'returned': len(matches),
+            'cache_size_for_user': cache_size,
+            'matches': matches
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Semantic memory debug error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Database dependency
 async def get_db() -> Optional[BuddyDatabase]:
     """Dependency to get database instance"""
@@ -173,25 +414,7 @@ async def get_db() -> Optional[BuddyDatabase]:
         return await get_database()
     return None
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database connection on startup"""
-    if USE_MONGODB:
-        try:
-            mongodb_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-            await init_database(mongodb_uri)
-            logger.info("MongoDB connected successfully")
-        except Exception as e:
-            logger.error(f"Failed to connect to MongoDB: {e}")
-            logger.info("Falling back to in-memory storage")
-
-# Shutdown event
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Close database connection on shutdown"""
-    if USE_MONGODB and buddy_db.connected:
-        await buddy_db.disconnect()
+## Duplicate startup/shutdown handlers removed (initial handlers earlier in file handle lifecycle)
 
 # Fallback in-memory storage (when MongoDB is not available)
 conversations: Dict[str, List[Dict[str, Any]]] = {}
@@ -300,10 +523,140 @@ async def get_buddy_status():
     
     return status_data
 
+@app.websocket("/ws/chat")
+async def websocket_chat(ws: WebSocket):
+    """Authenticated bi-directional chat WebSocket with optional token streaming.
+
+    Client connects with query param: /ws/chat?token=CLIENT_TOKEN
+    Send JSON: {"message": str, "user_id"?: str, "session_id"?: str, "stream"?: bool}
+    If stream true: server emits {type:start}, many {type:token, token:str}, finally {type:end, complete:bool, length:int}
+    Otherwise single message {response: str, ...}
+    """
+    # Simple token auth via query param
+    qp = ws.query_params
+    token = None
+    try:
+        token = qp.get("token")  # starlette QueryParams
+    except Exception:
+        token = None
+    if CLIENT_TOKEN and token != CLIENT_TOKEN:
+        await ws.accept()
+        await ws.send_json({"error": "auth_failed"})
+        await ws.close()
+        return
+    await ws.accept()
+    try:
+        while True:
+            data = await ws.receive_json()
+            user_message = data.get("message")
+            if not user_message:
+                await ws.send_json({"error": "missing_message"})
+                continue
+            user_id = data.get("user_id") or "ws_user"
+            session_id = data.get("session_id") or f"ws_{user_id}"
+            stream = bool(data.get("stream"))
+            try:
+                if USE_MONGODB:
+                    db = await get_database() if USE_MONGODB else None
+                else:
+                    db = None
+                history = []
+                if db and db.connected:
+                    history = await db.get_conversation_history(session_id, limit=5)
+                response_text = await generate_response(user_message, history, user_id, db)
+                if db and db.connected:
+                    await db.save_conversation(session_id=session_id, user_id=user_id, role="user", content=user_message)
+                    await db.save_conversation(session_id=session_id, user_id=user_id, role="assistant", content=response_text)
+                if not stream:
+                    await ws.send_json({
+                        "response": response_text,
+                        "user_id": user_id,
+                        "session_id": session_id,
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "transport": "websocket"
+                    })
+                else:
+                    tokens = response_text.split(" ")
+                    await ws.send_json({"type": "start", "user_id": user_id, "session_id": session_id})
+                    for tok in tokens:
+                        # include trailing space for reconstruction
+                        await ws.send_json({"type": "token", "token": tok + " "})
+                        await asyncio.sleep(0.005)  # tiny delay to simulate streaming
+                    await ws.send_json({"type": "end", "complete": True, "length": len(response_text)})
+            except Exception as e:  # noqa: BLE001
+                logger.error(f"WebSocket chat processing error: {e}")
+                await ws.send_json({"error": "processing_failure", "detail": str(e)})
+    except WebSocketDisconnect:
+        try:
+            await ws.close()
+        except Exception:
+            pass
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"WebSocket connection error: {e}")
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+@app.post("/car/voice")
+async def car_voice_endpoint(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    audio: UploadFile | None = File(None, description="Optional audio file (wav/pcm)"),
+    text: str | None = Form(None, description="Optional raw text if already transcribed"),
+    speed_kmh: float | None = Form(0.0),
+):
+    """Unified automotive voice/text interaction endpoint.
+    Accepts either audio (transcribed via ASR) or direct text and returns JSON with intent and response.
+    """
+    if 'automotive_core' not in globals():
+        raise HTTPException(status_code=503, detail="Automotive middleware unavailable")
+    try:
+        audio_bytes = await audio.read() if audio else None
+        meta = {"speed_kmh": speed_kmh or 0.0, "source": "api"}
+        result = await automotive_core.handle_user_input(audio=audio_bytes, text=text, meta=meta)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"/car/voice error: {e}")
+        raise HTTPException(status_code=500, detail="car_voice_processing_error")
+
+@app.post("/car/plugins")
+async def register_car_plugin(reg: CarPluginRegistration, api_key: str = Header(None, alias="X-Admin-API-Key")):
+    """Register a simple automotive intent plugin (template-based)."""
+    _require_admin(api_key)
+    if 'automotive_core' not in globals():
+        raise HTTPException(status_code=503, detail="Automotive middleware unavailable")
+    try:
+        intent_type = reg.intent_type.strip()
+        if not intent_type:
+            raise HTTPException(status_code=400, detail="intent_type required")
+        spoken = reg.spoken_text or reg.response_text
+        async def handler(intent, ctx):  # closure capturing texts
+            return {"response": reg.response_text, "spoken": spoken, "intent_type": intent_type}
+        automotive_core.register_plugin(intent_type, handler, override=True)
+        return {"status": "registered", "intent_type": intent_type}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Plugin registration failed: {e}")
+        raise HTTPException(status_code=500, detail="plugin_registration_failed")
+
+@app.get("/car/plugins")
+async def list_car_plugins(api_key: str = Header(None, alias="X-Admin-API-Key")):
+    _require_admin(api_key)
+    if 'automotive_core' not in globals():
+        raise HTTPException(status_code=503, detail="Automotive middleware unavailable")
+    from car.middleware.plugins import registry as plugin_registry
+    return {"intents": plugin_registry.list_intents()}
+
 @app.post("/chat", response_model=ChatResponse)
-async def chat(message: ChatMessage, background_tasks: BackgroundTasks, db: Optional[BuddyDatabase] = Depends(get_db)):
+async def chat(message: ChatMessage, background_tasks: BackgroundTasks, db: Optional[BuddyDatabase] = Depends(get_db), client_token: str | None = Header(None, alias="X-Client-Token")):
     """Handle chat messages with MongoDB persistence."""
     try:
+        if CLIENT_TOKEN and client_token != CLIENT_TOKEN:
+            raise HTTPException(status_code=401, detail="invalid_client_token")
         session_id = message.session_id or "session_001"
         user_id = message.user_id or "default_user"
         
@@ -885,6 +1238,28 @@ async def _handle_email_send_intent(entities: Dict, context_info: str) -> str:
     
     return response
 
+# ---- Stub handlers for not-yet-implemented advanced intents (prevent attribute errors) ---- #
+async def _handle_email_check_intent(entities: Dict, context_info: str) -> str:
+    return f"📧 Email check feature pending integration{context_info}\n\n(Stub response)"
+
+async def _handle_music_play_intent(entities: Dict, context_info: str) -> str:
+    return f"🎵 Music playback feature pending integration{context_info}\n\n(Stub response)"
+
+async def _handle_lights_control_intent(entities: Dict, context_info: str) -> str:
+    return f"💡 Smart lights control feature pending integration{context_info}\n\n(Stub response)"
+
+async def _handle_device_control_intent(entities: Dict, context_info: str) -> str:
+    return f"🛰️ Device control feature pending integration{context_info}\n\n(Stub response)"
+
+async def _handle_navigation_intent(entities: Dict, context_info: str) -> str:
+    return f"🗺️ Navigation feature pending integration{context_info}\n\n(Stub response)"
+
+async def _handle_task_create_intent(entities: Dict, context_info: str, user_id: str, db: Optional[BuddyDatabase]) -> str:
+    return f"✅ Task creation feature pending integration{context_info}\n\n(Stub response)"
+
+async def _handle_help_request_intent(relevant_context: List[Dict], confidence: float) -> str:
+    return "🆘 Help system: You can ask about reminders, calculations, time, weather (coming soon), or general chat. (Stub response)"
+
 async def _handle_calendar_schedule_intent(entities: Dict, context_info: str) -> str:
     """Handle calendar scheduling with time and entity extraction"""
     time_entities = entities.get('time_expressions', []) + entities.get('relative_time', [])
@@ -919,17 +1294,22 @@ async def _handle_reminder_create_intent(entities: Dict, context_info: str, user
     # Store reminder in database if available
     if db and hasattr(db, 'create_reminder'):
         try:
-            reminder_data = {
-                'user_id': user_id,
-                'task': ' '.join(subjects) if subjects else 'reminder task',
-                'time': time_entities[0] if time_entities else 'unspecified time',
-                'actions': actions,
-                'created_at': datetime.utcnow().isoformat(),
-                'status': 'active'
-            }
-            
-            await db.create_reminder(reminder_data)
-            storage_status = "✅ Stored in your personal reminder system"
+            title = ' '.join(subjects) if subjects else 'reminder task'
+            due_text = time_entities[0] if time_entities else None
+            # For now, set due_date to 1 hour from now (parsing natural language could be added later)
+            due_date = datetime.utcnow() + timedelta(hours=1)
+            await db.create_reminder(
+                user_id=user_id,
+                title=title,
+                description=f"Actions: {', '.join(actions)}" if actions else "",
+                due_date=due_date,
+                metadata={
+                    'raw_time': due_text,
+                    'entities_time': time_entities,
+                    'entities_actions': actions
+                }
+            )
+            storage_status = f"✅ Stored in your personal reminder system (due {due_date.strftime('%Y-%m-%d %H:%M')})"
         except Exception as e:
             storage_status = f"⚠️ Storage issue: {str(e)}"
     else:
@@ -1260,25 +1640,15 @@ async def _generate_basic_response(user_message: str, conversation_history: List
 
 if __name__ == "__main__":
     logger.info("Starting BUDDY Backend Server with MongoDB...")
-    
-    # Check MongoDB availability
+    from dynamic_config import get_host, get_port
+    host = get_host()
+    port = get_port()
     if USE_MONGODB:
         logger.info("MongoDB integration enabled")
     else:
         logger.info("MongoDB disabled - using in-memory storage")
-    
+    logger.info(f"Backend binding on {host}:{port}")
     if DEV_MODE:
-        uvicorn.run(
-            "enhanced_backend:app",
-            host="localhost", 
-            port=8082,
-            log_level="info",
-            reload=True
-        )
+        uvicorn.run("enhanced_backend:app", host=host, port=port, log_level="info", reload=True)
     else:
-        uvicorn.run(
-            app,
-            host="localhost", 
-            port=8082,
-            log_level="info"
-        )
+        uvicorn.run(app, host=host, port=port, log_level="info")

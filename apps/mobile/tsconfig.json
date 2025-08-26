@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noImplicitAny": true,
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+  "types": ["jest", "react", "react-native", "node"],
+    "baseUrl": "src",
+    "paths": {
+      "@middleware/*": ["middleware/*"],
+      "@data/*": ["data/*"],
+      "@services/*": ["services/*"],
+      "@security/*": ["security/*"],
+      "@ui/*": ["ui/*"],
+      "@state/*": ["state/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}

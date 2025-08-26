@@ -42,8 +42,24 @@ class BuddyStatusBridge:
             
             if os.path.exists(service_account_path):
                 # Use service account file (local development)
-                cred = credentials.Certificate(service_account_path)
-                logger.info("Using Firebase service account file")
+                try:
+                    # Load and validate the service account file
+                    with open(service_account_path, 'r') as f:
+                        service_account_data = json.load(f)
+                    
+                    # Fix any potential newline issues in the private key
+                    if 'private_key' in service_account_data:
+                        # Ensure proper newline formatting
+                        private_key = service_account_data['private_key']
+                        if '\\n' in private_key:
+                            private_key = private_key.replace('\\n', '\n')
+                            service_account_data['private_key'] = private_key
+                    
+                    cred = credentials.Certificate(service_account_data)
+                    logger.info("Using Firebase service account file")
+                except Exception as e:
+                    logger.error(f"Failed to load service account file: {e}")
+                    return False
             else:
                 # Use environment variables (production deployment)
                 logger.info("Firebase service account file not found, trying environment variables...")

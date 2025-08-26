@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Any, Callable, Union
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,7 +30,7 @@ class BuddySDKBase(ABC):
         self.device_id = config.get("device_id", str(uuid.uuid4()))
         self.user_id = config.get("user_id", "default_user")
         self.api_key = config.get("api_key", "")
-        self.server_url = config.get("server_url", "ws://localhost:8082")
+        self.server_url = config.get("server_url", f"ws://{os.getenv('BUDDY_HOST', 'localhost')}:{os.getenv('BUDDY_PORT', '8082')}")
         self.is_connected = False
         self.event_handlers: Dict[str, List[Callable]] = {}
         self.context_providers: Dict[str, Callable] = {}

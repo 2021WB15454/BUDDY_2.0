@@ -11,6 +11,7 @@ import subprocess
 import requests
 import threading
 from pathlib import Path
+from dynamic_config import get_http_base
 
 class BuddyCloudManager:
     def __init__(self):
@@ -53,7 +54,7 @@ class BuddyCloudManager:
             # Wait for backend to start
             for i in range(30):  # 30 second timeout
                 try:
-                    response = requests.get("http://localhost:8082/health", timeout=2)
+                    response = requests.get(f"{get_http_base()}/health", timeout=2)
                     if response.status_code == 200:
                         print("✅ Backend started successfully!")
                         return True
@@ -93,7 +94,7 @@ class BuddyCloudManager:
         
         try:
             # Test health endpoint
-            response = requests.get("http://localhost:8082/health", timeout=10)
+            response = requests.get(f"{get_http_base()}/health", timeout=10)
             if response.status_code == 200:
                 health_data = response.json()
                 db_status = health_data.get('database', {}).get('status', 'unknown')
@@ -109,7 +110,7 @@ class BuddyCloudManager:
                 "session_id": "startup_session"
             }
             
-            response = requests.post("http://localhost:8082/chat", json=chat_data, timeout=15)
+            response = requests.post(f"{get_http_base()}/chat", json=chat_data, timeout=15)
             if response.status_code == 200:
                 print("✅ Chat Test: OK")
             else:
@@ -148,7 +149,7 @@ class BuddyCloudManager:
         print()
         print("🎉 BUDDY 2.0 is now running with Cloud Database!")
         print("=" * 50)
-        print("📊 Backend API: http://localhost:8082")
+        print(f"📊 Backend API: {get_http_base()}")
         print("🌐 Web Interface: http://localhost:3000")
         print("💾 Database: MongoDB Atlas (Cloud)")
         print("📝 Chat: Available at web interface")

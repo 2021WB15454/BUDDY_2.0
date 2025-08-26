@@ -90,3 +90,27 @@ pympler>=0.9.0
 
 # Async database operations
 databases[postgresql]>=0.8.0
+
+# --- Added Advanced NLP / Audio Optional Dependencies (per user request) ---
+# Vector / embedding local store
+chromadb>=0.5.0
+
+# NLP pipeline (add model via: python -m spacy download en_core_web_sm during deploy step)
+spacy>=3.7.0
+
+# Lightweight speech/audio tooling (optional; PyAudio typically only for local Windows dev)
+# Note: On Linux (Render) PyAudio build may require system libs; consider omitting if unused.
+SpeechRecognition>=3.10.0
+pyttsx3>=2.90
+
+# Windows-only helper for installing PyAudio locally (not used in production containers)
+pipwin>=0.5.2; platform_system=="Windows"
+
+# PyAudio (only install on Windows via pip when wheels available)
+pyaudio>=0.2.13; platform_system=="Windows"
+
+# Coqui TTS (optional neural TTS engine)
+TTS>=0.22.0
+
+# NOTE: spaCy model 'en-core-web-sm' is not a PyPI requirement line here; install separately:
+#   python -m spacy download en_core_web_sm

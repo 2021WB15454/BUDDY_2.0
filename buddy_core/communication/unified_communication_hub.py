@@ -19,6 +19,7 @@ import websockets
 import aiohttp
 from aiohttp import web, WSMsgType
 import ssl
+import os
 import hashlib
 from cryptography.fernet import Fernet
 import jwt
@@ -775,11 +776,15 @@ async def main():
     print()
     
     # Create and initialize communication hub
-    hub = BuddyCommunicationHub(port=8082, api_port=8081)
+    ws_port = int(os.getenv("BUDDY_PORT", "8082"))
+    api_port = int(os.getenv("BUDDY_API_PORT", "8081"))
+    host = os.getenv("BUDDY_HOST", "localhost")
+    
+    hub = BuddyCommunicationHub(port=ws_port, api_port=api_port)
     
     print("🚀 Initializing Communication Hub...")
-    print(f"   WebSocket Server: ws://localhost:8082")
-    print(f"   REST API Server: http://localhost:8081")
+    print(f"   WebSocket Server: ws://{host}:{ws_port}")
+    print(f"   REST API Server: http://{host}:{api_port}")
     print()
     
     try:

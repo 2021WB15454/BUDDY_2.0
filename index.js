@@ -6,7 +6,11 @@ const fs = require('fs');
 
 let mainWindow;
 let backendProcess = null;
-const BACKEND_BASE_URL = 'http://localhost:8082';
+const BACKEND_BASE_URL = (() => {
+  const host = process.env.BUDDY_HOST || 'localhost';
+  const port = process.env.BUDDY_PORT || '8082';
+  return `http://${host}:${port}`;
+})();
 
 async function waitForBackend(maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {

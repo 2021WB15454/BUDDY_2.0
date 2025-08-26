@@ -27,12 +27,13 @@ Architecture:
     BUDDY Core (this) ←→ Device Interfaces (Electron, Flutter, etc.)
     
 Device interfaces connect via:
-    - WebSocket: ws://localhost:8082/ws
-    - REST API: http://localhost:8082/api/*
+    - WebSocket: ws://{os.getenv('BUDDY_HOST','localhost')}:{os.getenv('BUDDY_PORT','8082')}/ws
+    - REST API: http://{os.getenv('BUDDY_HOST','localhost')}:{os.getenv('BUDDY_PORT','8082')}/api/*
 """
 
 import asyncio
 import sys
+import os
 from pathlib import Path
 
 # Add the buddy_core module to path
@@ -41,11 +42,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 from buddy_core.runtime import main
 
 if __name__ == "__main__":
+    host = os.getenv('BUDDY_HOST', 'localhost')
+    port = os.getenv('BUDDY_PORT', '8082')
     print("🤖 BUDDY Core - Multi-Device AI Assistant")
     print("=" * 50)
     print("Starting BUDDY Core with new architecture...")
-    print("WebSocket: ws://localhost:8082/ws")
-    print("REST API: http://localhost:8082/api/")
+    print(f"WebSocket: ws://{host}:{port}/ws")
+    print(f"REST API: http://{host}:{port}/api/")
     print("=" * 50)
     
     # Run the main BUDDY Core runtime

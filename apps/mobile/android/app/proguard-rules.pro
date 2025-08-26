@@ -1,0 +1,3 @@
+-keep class com.wenkesj.voice.** { *; }
+-keep class com.facebook.react.** { *; }
+-dontwarn com.facebook.react.**
