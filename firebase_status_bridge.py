@@ -28,6 +28,41 @@ class BuddyStatusBridge:
         self.firebase_app = None
         self.status_ref = None
         self.is_connected = False
+    
+    def _fix_private_key_format(self, private_key: str) -> str:
+        """Fix Firebase private key formatting issues"""
+        if not private_key:
+            return ""
+        
+        # Replace literal \n with actual newlines
+        key = private_key.replace('\\n', '\n')
+        
+        # Remove any extra whitespace or padding issues
+        key = key.strip()
+        
+        # Ensure proper PEM format
+        if not key.startswith('-----BEGIN PRIVATE KEY-----'):
+            # If the key doesn't have headers, add them
+            if key.startswith('MII'):
+                key = f"-----BEGIN PRIVATE KEY-----\n{key}\n-----END PRIVATE KEY-----"
+        
+        # Fix any double newlines or spacing issues
+        lines = key.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            cleaned_line = line.strip()
+            if cleaned_line:
+                cleaned_lines.append(cleaned_line)
+        
+        # Rebuild with proper formatting
+        if len(cleaned_lines) >= 3:
+            result = cleaned_lines[0] + '\n'  # BEGIN line
+            for line in cleaned_lines[1:-1]:  # Middle content
+                result += line + '\n'
+            result += cleaned_lines[-1]  # END line
+            return result
+        
+        return key
         
     async def initialize_firebase(self):
         """Initialize Firebase connection for status updates"""
@@ -78,7 +113,7 @@ class BuddyStatusBridge:
                     "type": "service_account",
                     "project_id": os.getenv("FIREBASE_PROJECT_ID", "buddyai-42493"),
                     "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
-                    "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace('\\n', '\n'),
+                    "private_key": self._fix_private_key_format(os.getenv("FIREBASE_PRIVATE_KEY", "")),
                     "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
                     "client_id": os.getenv("FIREBASE_CLIENT_ID"),
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -91,7 +126,30 @@ class BuddyStatusBridge:
                 # Check if we have the required environment variables
                 if firebase_config["private_key_id"] and firebase_config["private_key"] and firebase_config["client_email"]:
                     logger.info("✅ All required Firebase environment variables found")
-                    cred = credentials.Certificate(firebase_config)
+                    
+                    # Debug the private key format
+                    private_key = firebase_config["private_key"]
+                    logger.info(f"Private key length: {len(private_key)} characters")
+                    logger.info(f"Private key starts with: {private_key[:50]}...")
+                    logger.info(f"Private key ends with: ...{private_key[-50:]}")
+                    
+                    try:
+                        cred = credentials.Certificate(firebase_config)
+                        logger.info("✅ Firebase credentials created successfully")
+                    except Exception as cred_error:
+                        logger.error(f"❌ Failed to create Firebase credentials: {cred_error}")
+                        logger.error(f"Private key format issue - trying alternative formatting...")
+                        
+                        # Try alternative formatting
+                        alt_key = firebase_config["private_key"].replace('\n', '\\n')
+                        firebase_config["private_key"] = alt_key.replace('\\n', '\n')
+                        try:
+                            cred = credentials.Certificate(firebase_config)
+                            logger.info("✅ Firebase credentials created with alternative formatting")
+                        except Exception as alt_error:
+                            logger.error(f"❌ Alternative formatting also failed: {alt_error}")
+                            return False
+                    
                     logger.info("Using Firebase credentials from environment variables")
                 else:
                     missing_vars = []
