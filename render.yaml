@@ -2,9 +2,9 @@ services:
   - type: web
     name: buddy-api
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
-    plan: starter
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python cloud_backend.py
+    plan: free
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
@@ -13,12 +13,12 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: HOST
+        value: 0.0.0.0
       - key: RENDER_EXTERNAL_URL
         value: https://buddy-2-0.onrender.com
       - key: MONGODB_URI
         value: mongodb+srv://BUDDY_AI:Preetty25@cluster0.fbbl9jd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
-      - key: PINECONE_API_KEY
-        value: pcsk_56X328_Ctig2vnq5uu4Nq8fm31fXozUTgYad6ryudnGRhH6bTmvdJTSeh3ZhFADKdFBeo6
       - key: WEATHER_API_KEY
         value: ff2cbe677bbfc325d2b615c86a20daef
       - key: BUDDY_JWT_SECRET
@@ -33,4 +33,6 @@ services:
         value: firebase-adminsdk-fbsvc@buddyai-42493.iam.gserviceaccount.com
       - key: FIREBASE_CLIENT_ID
         value: "100239735555307425587"
+      - key: OPENAI_API_KEY
+        value: $OPENAI_API_KEY
     autoDeploy: true

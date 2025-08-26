@@ -1,0 +1,381 @@
+"""
+BUDDY Cloud Backend - Production Ready
+
+A simplified FastAPI server optimized for cloud deployment.
+Includes core features with graceful fallbacks for missing dependencies.
+"""
+
+import os
+import asyncio
+import logging
+import time
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, status, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+# Try to import optional dependencies with fallbacks
+try:
+    from mongodb_integration import buddy_db, init_database, get_database
+    MONGODB_AVAILABLE = True
+    logger.info("MongoDB integration available")
+except ImportError:
+    MONGODB_AVAILABLE = False
+    logger.warning("MongoDB not available - using memory storage")
+
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+    logger.info("OpenAI integration available")
+except ImportError:
+    OPENAI_AVAILABLE = False
+    logger.warning("OpenAI not available - using simple responses")
+
+try:
+    from firebase_admin import credentials, messaging
+    import firebase_admin
+    FIREBASE_AVAILABLE = True
+    logger.info("Firebase integration available")
+except ImportError:
+    FIREBASE_AVAILABLE = False
+    logger.warning("Firebase not available - notifications disabled")
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="BUDDY AI Assistant - Cloud Backend",
+    description="Simplified cloud-compatible BUDDY backend",
+    version="1.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Pydantic models
+class ChatMessage(BaseModel):
+    message: str
+    user_id: Optional[str] = "default"
+    conversation_id: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    response: str
+    timestamp: str
+    conversation_id: str
+    confidence: float = 1.0
+
+class ReminderRequest(BaseModel):
+    title: str
+    description: str = ""
+    due_time: str  # ISO format
+
+class ReminderResponse(BaseModel):
+    id: str
+    title: str
+    description: str
+    due_time: str
+    status: str
+
+# In-memory storage fallback
+memory_storage = {
+    "conversations": {},
+    "reminders": {},
+    "analytics": []
+}
+
+# Simple response patterns
+RESPONSE_PATTERNS = {
+    "greeting": [
+        "Hello! How can I help you today?",
+        "Hi there! What can I do for you?",
+        "Greetings! I'm BUDDY, your AI assistant."
+    ],
+    "how_are_you": [
+        "I'm doing great! Thanks for asking. How are you?",
+        "I'm functioning perfectly! How can I assist you?",
+        "All systems operational! What would you like to know?"
+    ],
+    "time": [
+        f"The current time is {datetime.now().strftime('%H:%M:%S')}",
+        f"It's {datetime.now().strftime('%I:%M %p')} right now"
+    ],
+    "date": [
+        f"Today is {datetime.now().strftime('%A, %B %d, %Y')}",
+        f"The date is {datetime.now().strftime('%Y-%m-%d')}"
+    ],
+    "default": [
+        "That's interesting! Tell me more.",
+        "I understand. What else would you like to know?",
+        "Thanks for sharing that with me!"
+    ]
+}
+
+async def get_simple_response(message: str) -> tuple[str, float]:
+    """Generate simple response without AI dependencies"""
+    message_lower = message.lower()
+    
+    if any(word in message_lower for word in ["hello", "hi", "hey", "greetings"]):
+        return RESPONSE_PATTERNS["greeting"][0], 0.9
+    elif "how are you" in message_lower:
+        return RESPONSE_PATTERNS["how_are_you"][0], 0.9
+    elif "time" in message_lower:
+        return RESPONSE_PATTERNS["time"][0], 0.8
+    elif "date" in message_lower or "today" in message_lower:
+        return RESPONSE_PATTERNS["date"][0], 0.8
+    else:
+        return f"You said: {message}. That's interesting!", 0.6
+
+async def get_ai_response(message: str) -> tuple[str, float]:
+    """Get AI response using OpenAI if available"""
+    if not OPENAI_AVAILABLE:
+        return await get_simple_response(message)
+    
+    try:
+        # Simple OpenAI integration
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are BUDDY, a helpful AI assistant."},
+                {"role": "user", "content": message}
+            ],
+            max_tokens=150
+        )
+        return response.choices[0].message.content, 0.9
+    except Exception as e:
+        logger.error(f"OpenAI error: {e}")
+        return await get_simple_response(message)
+
+# API Endpoints
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "features": {
+            "mongodb": MONGODB_AVAILABLE,
+            "openai": OPENAI_AVAILABLE,
+            "firebase": FIREBASE_AVAILABLE
+        }
+    }
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(message_data: ChatMessage):
+    """Main chat endpoint"""
+    try:
+        start_time = time.time()
+        
+        # Generate response
+        response_text, confidence = await get_ai_response(message_data.message)
+        
+        # Create conversation ID if not provided
+        conversation_id = message_data.conversation_id or f"conv_{int(time.time())}"
+        
+        # Store conversation if MongoDB available
+        if MONGODB_AVAILABLE:
+            try:
+                db = await get_database()
+                await db.save_conversation(
+                    session_id=conversation_id,
+                    user_id=message_data.user_id,
+                    role="user",
+                    content=message_data.message
+                )
+                await db.save_conversation(
+                    session_id=conversation_id,
+                    user_id=message_data.user_id,
+                    role="assistant",
+                    content=response_text
+                )
+            except Exception as e:
+                logger.error(f"Database error: {e}")
+        else:
+            # Store in memory
+            if conversation_id not in memory_storage["conversations"]:
+                memory_storage["conversations"][conversation_id] = []
+            memory_storage["conversations"][conversation_id].extend([
+                {"role": "user", "content": message_data.message, "timestamp": datetime.now().isoformat()},
+                {"role": "assistant", "content": response_text, "timestamp": datetime.now().isoformat()}
+            ])
+        
+        response_time = time.time() - start_time
+        logger.info(f"Chat response generated in {response_time:.2f}s")
+        
+        return ChatResponse(
+            response=response_text,
+            timestamp=datetime.now().isoformat(),
+            conversation_id=conversation_id,
+            confidence=confidence
+        )
+        
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """Get conversation history"""
+    try:
+        if MONGODB_AVAILABLE:
+            db = await get_database()
+            history = await db.get_conversation_history(conversation_id)
+            return {"conversation_id": conversation_id, "messages": history}
+        else:
+            # Return from memory
+            messages = memory_storage["conversations"].get(conversation_id, [])
+            return {"conversation_id": conversation_id, "messages": messages}
+    except Exception as e:
+        logger.error(f"Get conversation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve conversation")
+
+@app.post("/reminders", response_model=ReminderResponse)
+async def create_reminder(reminder: ReminderRequest):
+    """Create a new reminder"""
+    try:
+        reminder_id = f"rem_{int(time.time())}"
+        due_date = datetime.fromisoformat(reminder.due_time.replace('Z', '+00:00'))
+        
+        if MONGODB_AVAILABLE:
+            db = await get_database()
+            await db.create_reminder(
+                user_id="default",
+                title=reminder.title,
+                description=reminder.description,
+                due_date=due_date
+            )
+        else:
+            # Store in memory
+            memory_storage["reminders"][reminder_id] = {
+                "title": reminder.title,
+                "description": reminder.description,
+                "due_time": reminder.due_time,
+                "status": "active"
+            }
+        
+        return ReminderResponse(
+            id=reminder_id,
+            title=reminder.title,
+            description=reminder.description,
+            due_time=reminder.due_time,
+            status="active"
+        )
+        
+    except Exception as e:
+        logger.error(f"Create reminder error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create reminder")
+
+@app.get("/reminders")
+async def get_reminders(user_id: str = "default"):
+    """Get all reminders for a user"""
+    try:
+        if MONGODB_AVAILABLE:
+            db = await get_database()
+            reminders = await db.get_user_reminders(user_id)
+            return {"reminders": reminders}
+        else:
+            # Return from memory
+            return {"reminders": list(memory_storage["reminders"].values())}
+    except Exception as e:
+        logger.error(f"Get reminders error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve reminders")
+
+@app.get("/analytics")
+async def get_analytics():
+    """Get basic analytics"""
+    try:
+        if MONGODB_AVAILABLE:
+            db = await get_database()
+            stats = await db.get_daily_stats(days=7)
+            return {"analytics": stats}
+        else:
+            # Return basic memory stats
+            return {
+                "analytics": {
+                    "conversations": len(memory_storage["conversations"]),
+                    "reminders": len(memory_storage["reminders"]),
+                    "total_messages": sum(len(conv) for conv in memory_storage["conversations"].values())
+                }
+            }
+    except Exception as e:
+        logger.error(f"Analytics error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve analytics")
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logger.info("🚀 Starting BUDDY Cloud Backend...")
+    
+    # Initialize MongoDB if available
+    if MONGODB_AVAILABLE:
+        try:
+            mongodb_uri = os.getenv("MONGODB_URI")
+            if mongodb_uri:
+                await init_database(mongodb_uri)
+                logger.info("✅ MongoDB initialized successfully")
+            else:
+                logger.warning("⚠️  MongoDB URI not found, using memory storage")
+        except Exception as e:
+            logger.error(f"❌ MongoDB initialization failed: {e}")
+    
+    # Initialize Firebase if available
+    if FIREBASE_AVAILABLE:
+        try:
+            service_account_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "config/firebase-service-account.json")
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+                firebase_admin.initialize_app(cred)
+                logger.info("✅ Firebase initialized successfully")
+            else:
+                logger.warning("⚠️  Firebase service account not found")
+        except Exception as e:
+            logger.error(f"❌ Firebase initialization failed: {e}")
+    
+    logger.info("🎉 BUDDY Cloud Backend started successfully!")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    logger.info("🔄 Shutting down BUDDY Cloud Backend...")
+    
+    if MONGODB_AVAILABLE:
+        try:
+            from mongodb_integration import close_database
+            await close_database()
+            logger.info("✅ MongoDB connection closed")
+        except Exception as e:
+            logger.error(f"❌ MongoDB shutdown error: {e}")
+    
+    logger.info("👋 BUDDY Cloud Backend shut down complete")
+
+if __name__ == "__main__":
+    # Configuration
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 8081))
+    
+    logger.info(f"🌐 Starting server on {host}:{port}")
+    
+    uvicorn.run(
+        "cloud_backend:app",
+        host=host,
+        port=port,
+        log_level="info",
+        reload=False  # Disable reload in production
+    )
