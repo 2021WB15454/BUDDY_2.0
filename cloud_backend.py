@@ -12,8 +12,9 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, status, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 import uvicorn
 
 # Phase 1 foundational imports
@@ -26,6 +27,22 @@ from plugins.registry import registry, Plugin
 from i18n.translator import translate
 from vector.semantic_index import semantic_index
 from jobs.scheduler import scheduler
+
+# Auth integration
+from packages.core.buddy.auth.jwt_manager import BuddyAuthManager
+from packages.core.buddy.auth.api import BuddyAuthAPI, create_auth_routes, BuddyAuthMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+
+# Optional OpenTelemetry (deferred if not installed)
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    OTEL_AVAILABLE = True
+except Exception:
+    OTEL_AVAILABLE = False
 
 # Set up logging
 configure_logging(settings.environment)
@@ -85,10 +102,16 @@ app.add_middleware(MetricsMiddleware)
 
 # Pydantic models
 class ChatMessage(BaseModel):
-    message: str
-    user_id: Optional[str] = "default"
+    message: str = Field(..., min_length=1, max_length=4000)
+    user_id: Optional[str] = Field("default", min_length=1, max_length=100)
     conversation_id: Optional[str] = None
-    locale: Optional[str] = None
+    locale: Optional[str] = Field(None, min_length=2, max_length=5)
+
+    @validator("locale")
+    def normalize_locale(cls, v):
+        if v:
+            return v.lower()
+        return v
 
 class ChatResponse(BaseModel):
     response: str
@@ -97,9 +120,17 @@ class ChatResponse(BaseModel):
     confidence: float = 1.0
 
 class ReminderRequest(BaseModel):
-    title: str
-    description: str = ""
-    due_time: str  # ISO format
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field("", max_length=1000)
+    due_time: str = Field(..., description="ISO8601 timestamp UTC")  # TODO: move to datetime field
+
+    @validator("due_time")
+    def validate_due_time(cls, v):
+        try:
+            datetime.fromisoformat(v.replace('Z', '+00:00'))
+        except Exception:
+            raise ValueError("due_time must be valid ISO8601")
+        return v
 
 class ReminderResponse(BaseModel):
     id: str
@@ -111,9 +142,25 @@ class ReminderResponse(BaseModel):
 # In-memory storage fallback
 memory_storage = {
     "conversations": {},
-    "reminders": {},
+    "reminders": {},  # reminder_id -> data
     "analytics": []
 }
+
+# Error taxonomy (simple)
+class ErrorCodes:
+    INTERNAL_ERROR = "internal_error"
+    VALIDATION_ERROR = "validation_error"
+    NOT_FOUND = "not_found"
+    UNAUTHORIZED = "unauthorized"
+    RATE_LIMIT = "rate_limited"
+@app.get("/semantic/search")
+async def semantic_search(q: str, top_k: int = 3):
+    results = semantic_index.search(q, top_k=top_k)
+    return {"query": q, "results": [{"text": t, "score": s} for t, s in results]}
+
+@app.get("/protected/ping")
+async def protected_ping(claims: Dict = Depends(lambda cred: auth_api.verify_token(cred))):  # type: ignore
+    return {"message": "pong", "user": claims.get("sub")}
 
 # Simple response patterns
 RESPONSE_PATTERNS = {
@@ -273,11 +320,17 @@ async def get_conversation(conversation_id: str):
         raise HTTPException(status_code=500, detail="Failed to retrieve conversation")
 
 @app.post("/reminders", response_model=ReminderResponse)
-async def create_reminder(reminder: ReminderRequest):
+async def create_reminder(reminder: ReminderRequest, credentials: HTTPAuthorizationCredentials = Depends()):
     """Create a new reminder"""
     try:
         reminder_id = f"rem_{int(time.time())}"
         due_date = datetime.fromisoformat(reminder.due_time.replace('Z', '+00:00'))
+        # schedule execution
+        delay = (due_date - datetime.now(due_date.tzinfo)).total_seconds()
+        if delay > 0:
+            def trigger():
+                logger.info("reminder_due", id=reminder_id, title=reminder.title)
+            scheduler.schedule_interval(f"reminder_{reminder_id}", int(delay), trigger)  # one-shot simulated via interval
         
         if MONGODB_AVAILABLE:
             db = await get_database()
@@ -309,7 +362,7 @@ async def create_reminder(reminder: ReminderRequest):
         raise HTTPException(status_code=500, detail="Failed to create reminder")
 
 @app.get("/reminders")
-async def get_reminders(user_id: str = "default"):
+async def get_reminders(user_id: str = "default", credentials: HTTPAuthorizationCredentials = Depends()):
     """Get all reminders for a user"""
     try:
         if MONGODB_AVAILABLE:
@@ -373,6 +426,21 @@ async def startup_event():
         except Exception as e:
             logger.error(f"❌ Firebase initialization failed: {e}")
     
+    # Auth setup
+    global auth_api
+    auth_api = None  # type: ignore
+    if settings.mongodb_uri:
+        try:
+            client = AsyncIOMotorClient(settings.mongodb_uri)
+            auth_manager = BuddyAuthManager(jwt_secret=settings.jwt_secret, mongo_client=client, database_name="buddy_auth")
+            await auth_manager.initialize_collections()
+            auth_api = BuddyAuthAPI(auth_manager=auth_manager)
+            create_auth_routes(app, auth_api)
+            app.middleware("http")(BuddyAuthMiddleware(auth_api))
+            logger.info("✅ Auth system initialized")
+        except Exception as e:
+            logger.error("Auth init failed", error=str(e))
+
     # Register core plugins stub
     registry.register(Plugin(name="core_memory"))
     registry.register(Plugin(name="semantic_index"))
