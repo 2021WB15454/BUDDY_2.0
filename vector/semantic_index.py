@@ -5,6 +5,7 @@ if available. Later phases: persistence, ANN (FAISS), versioned embeddings.
 """
 from __future__ import annotations
 from typing import List, Tuple
+from datetime import datetime
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -35,7 +36,11 @@ class SemanticIndex:
             self.embeddings = emb
         if self.persist and self.mongo:
             try:
-                self.collection.insert_one({"text": text, "ts": datetime.utcnow()})  # raw text only phase 1
+                vec = None
+                if self.model:
+                    import numpy as np
+                    vec = self.model.encode([text], convert_to_numpy=True)[0].tolist()
+                self.collection.insert_one({"text": text, "vector": vec, "ts": datetime.utcnow()})
             except Exception:
                 pass
 

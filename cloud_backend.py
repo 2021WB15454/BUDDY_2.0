@@ -43,6 +43,30 @@ try:
     OTEL_AVAILABLE = True
 except Exception:
     OTEL_AVAILABLE = False
+    trace = None  # type: ignore
+def rbac_required(required_roles: List[str]):
+    def dependency(credentials: HTTPAuthorizationCredentials = Depends()):
+        if not auth_api:
+            raise HTTPException(status_code=401, detail="Auth not initialized")
+        claims = auth_api.auth_manager.verify_access_token(credentials.credentials)  # type: ignore
+        if not claims:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        roles = claims.get("roles", [])
+        if any(r in roles for r in required_roles):
+            return claims
+        raise HTTPException(status_code=403, detail="Forbidden - missing role")
+    return dependency
+
+# Standard error schema helper
+def error_response(code: str, message: str, request: Request, details: Dict | None = None, status_code: int = 400):
+    return {
+        "error": {
+            "code": code,
+            "message": message,
+            "details": details or {}
+        },
+        "request_id": getattr(request.state, "correlation_id", None)
+    }
 
 # Set up logging
 configure_logging(settings.environment)
@@ -158,9 +182,26 @@ async def semantic_search(q: str, top_k: int = 3):
     results = semantic_index.search(q, top_k=top_k)
     return {"query": q, "results": [{"text": t, "score": s} for t, s in results]}
 
+@app.get("/admin/echo")
+async def admin_echo(claims: Dict = Depends(rbac_required(["admin"]))):
+    return {"message": "admin access granted", "user": claims.get("sub"), "roles": claims.get("roles", [])}
+
 @app.get("/protected/ping")
 async def protected_ping(claims: Dict = Depends(lambda cred: auth_api.verify_token(cred))):  # type: ignore
     return {"message": "pong", "user": claims.get("sub")}
+
+@app.post("/tracing/enable")
+async def enable_tracing():
+    if not OTEL_AVAILABLE:
+        raise HTTPException(status_code=501, detail="Tracing not available")
+    if trace.get_tracer_provider():  # already configured
+        return {"status": "already_enabled"}
+    resource = Resource.create({"service.name": "buddy-cloud-backend"})
+    provider = TracerProvider(resource=resource)
+    processor = BatchSpanProcessor(OTLPSpanExporter())
+    provider.add_span_processor(processor)
+    trace.set_tracer_provider(provider)
+    return {"status": "enabled"}
 
 # Simple response patterns
 RESPONSE_PATTERNS = {
@@ -253,7 +294,13 @@ async def chat(message_data: ChatMessage, credentials: HTTPAuthorizationCredenti
         start_time = time.time()
         
         # Generate response
-        response_text, confidence = await get_ai_response(message_data.message)
+        tracer = trace.get_tracer("buddy.chat") if OTEL_AVAILABLE and trace.get_tracer_provider() else None
+        span_ctx = tracer.start_as_current_span("chat_handler") if tracer else None
+        if span_ctx:
+            async with span_ctx:
+                response_text, confidence = await get_ai_response(message_data.message)
+        else:
+            response_text, confidence = await get_ai_response(message_data.message)
         # Simple i18n demo: override greeting if user locale provided
         if message_data.locale:
             if any(word in message_data.message.lower() for word in ["hello", "hi", "hey", "hola", "bonjour"]):
@@ -299,6 +346,8 @@ async def chat(message_data: ChatMessage, credentials: HTTPAuthorizationCredenti
             confidence=confidence
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -333,7 +382,8 @@ async def create_reminder(reminder: ReminderRequest, credentials: HTTPAuthorizat
                 # mark in-memory reminder complete
                 if reminder_id in memory_storage["reminders"]:
                     memory_storage["reminders"][reminder_id]["status"] = "completed"
-            scheduler.schedule_interval(f"reminder_{reminder_id}", int(delay), trigger, one_shot=True)
+            run_at = due_date
+            scheduler.schedule_at(f"reminder_{reminder_id}", run_at, trigger)
         
         if MONGODB_AVAILABLE:
             db = await get_database()
@@ -456,6 +506,46 @@ async def startup_event():
     scheduler.schedule_interval("heartbeat", 300, lambda: logger.info("heartbeat", ts=datetime.utcnow().isoformat()))
 
     logger.info("🎉 BUDDY Cloud Backend started successfully!")
+
+if settings.environment != 'production':
+    @app.get("/auth/test-token")
+    async def get_test_token(user_id: str = "test_user", roles: str = "user"):
+        import jwt, time
+        now = int(time.time())
+        claims = {
+            "sub": user_id,
+            "device_id": "dev-test",
+            "device_type": "web",
+            "iat": now,
+            "exp": now + 1800,
+            "iss": "buddy-ai",
+            "aud": "buddy-api",
+            "roles": roles.split(",") if roles else ["user"]
+        }
+        token = jwt.encode(claims, settings.jwt_secret, algorithm="HS256")
+        return {"access_token": token}
+
+# Error handlers
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exc_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(status_code=exc.status_code, content=error_response(
+        code=ErrorCodes.INTERNAL_ERROR if exc.status_code >=500 else ErrorCodes.VALIDATION_ERROR,
+        message=exc.detail if isinstance(exc.detail, str) else str(exc.detail),
+        request=request,
+        status_code=exc.status_code
+    ))
+
+@app.exception_handler(Exception)
+async def unhandled_exc_handler(request: Request, exc: Exception):
+    logger.error("Unhandled exception", error=str(exc))
+    return JSONResponse(status_code=500, content=error_response(
+        code=ErrorCodes.INTERNAL_ERROR,
+        message="Internal server error",
+        request=request
+    ))
 
 @app.on_event("shutdown")
 async def shutdown_event():

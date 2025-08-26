@@ -4,6 +4,7 @@
 [![Platform](https://img.shields.io/badge/platform-cross--platform-green.svg)](https://github.com/your-username/BUDDY_2.0)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/your-username/BUDDY_2.0/actions)
+[![Coverage](https://img.shields.io/badge/coverage-initial-lightgrey.svg)](./)
 
 > **The next-generation AI assistant that works seamlessly across all your devices** 🎤📱💻⌚📺🚗
 
