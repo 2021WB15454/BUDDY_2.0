@@ -16,12 +16,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
+# Phase 1 foundational imports
+from infrastructure.config.settings import settings
+from infrastructure.logging.structured import configure_logging, get_logger
+from infrastructure.middleware import CorrelationIdMiddleware, RateLimitMiddleware, MetricsMiddleware
+from infrastructure.security.ratelimit import RateLimiter
+from infrastructure.metrics import metrics
+from plugins.registry import registry, Plugin
+from i18n.translator import translate
+from vector.semantic_index import semantic_index
+from jobs.scheduler import scheduler
+
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+configure_logging(settings.environment)
+logger = get_logger("cloud-backend")
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -56,24 +64,31 @@ except ImportError:
 # Initialize FastAPI app
 app = FastAPI(
     title="BUDDY AI Assistant - Cloud Backend",
-    description="Simplified cloud-compatible BUDDY backend",
-    version="1.0.0"
+    description="Simplified cloud-compatible BUDDY backend (Phase 1 foundations added)",
+    version=settings.version
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Structured / metrics / rate limit middleware
+rate_limiter = RateLimiter(settings.rate_limit_requests, settings.rate_limit_window_seconds)
+app.add_middleware(CorrelationIdMiddleware)
+app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
+app.add_middleware(MetricsMiddleware)
 
 # Pydantic models
 class ChatMessage(BaseModel):
     message: str
     user_id: Optional[str] = "default"
     conversation_id: Optional[str] = None
+    locale: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -166,16 +181,23 @@ async def get_ai_response(message: str) -> tuple[str, float]:
 # API Endpoints
 @app.get("/health")
 async def health():
-    """Health check endpoint"""
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
+        "version": settings.version,
+        "environment": settings.environment,
         "features": {
             "mongodb": MONGODB_AVAILABLE,
             "openai": OPENAI_AVAILABLE,
-            "firebase": FIREBASE_AVAILABLE
+            "firebase": FIREBASE_AVAILABLE,
+            "metrics": settings.enable_metrics,
         }
     }
+
+@app.get("/ready")
+async def readiness():
+    # Simple readiness (later: check DB, queue, vector index load)
+    return {"ready": True}
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(message_data: ChatMessage):
@@ -185,6 +207,10 @@ async def chat(message_data: ChatMessage):
         
         # Generate response
         response_text, confidence = await get_ai_response(message_data.message)
+        # Simple i18n demo: override greeting if user locale provided
+        if message_data.locale:
+            if any(word in message_data.message.lower() for word in ["hello", "hi", "hey", "hola", "bonjour"]):
+                response_text = translate("greeting", locale=message_data.locale)
         
         # Create conversation ID if not provided
         conversation_id = message_data.conversation_id or f"conv_{int(time.time())}"
@@ -320,8 +346,7 @@ async def get_analytics():
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize services on startup"""
-    logger.info("🚀 Starting BUDDY Cloud Backend...")
+    logger.info("🚀 Starting BUDDY Cloud Backend...", env=settings.environment, version=settings.version)
     
     # Initialize MongoDB if available
     if MONGODB_AVAILABLE:
@@ -348,6 +373,17 @@ async def startup_event():
         except Exception as e:
             logger.error(f"❌ Firebase initialization failed: {e}")
     
+    # Register core plugins stub
+    registry.register(Plugin(name="core_memory"))
+    registry.register(Plugin(name="semantic_index"))
+
+    # Seed semantic index with sample (later: load from DB)
+    semantic_index.add("BUDDY is your helpful AI assistant.")
+    semantic_index.add("You can set reminders and have conversations.")
+
+    # Schedule simple analytics heartbeat
+    scheduler.schedule_interval("heartbeat", 300, lambda: logger.info("heartbeat", ts=datetime.utcnow().isoformat()))
+
     logger.info("🎉 BUDDY Cloud Backend started successfully!")
 
 @app.on_event("shutdown")
@@ -366,16 +402,7 @@ async def shutdown_event():
     logger.info("👋 BUDDY Cloud Backend shut down complete")
 
 if __name__ == "__main__":
-    # Configuration
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 8081))
-    
-    logger.info(f"🌐 Starting server on {host}:{port}")
-    
-    uvicorn.run(
-        "cloud_backend:app",
-        host=host,
-        port=port,
-        log_level="info",
-        reload=False  # Disable reload in production
-    )
+    logger.info("🌐 Starting server", host=host, port=port)
+    uvicorn.run("cloud_backend:app", host=host, port=port, log_level="info", reload=False)
