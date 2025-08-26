@@ -17,17 +17,27 @@ except Exception:
 
 
 class SemanticIndex:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", persist: bool = False, mongo_client=None, db_name: str = "buddy_vectors"):
         self.model_name = model_name
         self.model = SentenceTransformer(model_name) if MODEL_AVAILABLE else None
         self.texts: List[str] = []
         self.embeddings = None
+        self.persist = persist and mongo_client is not None
+        self.mongo = None
+        if self.persist:
+            self.mongo = mongo_client[db_name]
+            self.collection = self.mongo["embeddings"]
 
     def add(self, text: str):
         self.texts.append(text)
         if self.model:
             emb = self.model.encode(self.texts, convert_to_numpy=True)
             self.embeddings = emb
+        if self.persist and self.mongo:
+            try:
+                self.collection.insert_one({"text": text, "ts": datetime.utcnow()})  # raw text only phase 1
+            except Exception:
+                pass
 
     def search(self, query: str, top_k: int = 3) -> List[Tuple[str, float]]:
         if not self.model or self.embeddings is None:

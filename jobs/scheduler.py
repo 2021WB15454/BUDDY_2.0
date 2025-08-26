@@ -14,7 +14,7 @@ class SimpleScheduler:
     def __init__(self):
         self._tasks: Dict[str, asyncio.Task] = {}
 
-    def schedule_interval(self, name: str, seconds: int, func: Callable):
+    def schedule_interval(self, name: str, seconds: int, func: Callable, one_shot: bool = False):
         async def runner():
             await asyncio.sleep(1)
             while True:
@@ -23,6 +23,8 @@ class SimpleScheduler:
                     res = func()
                     if asyncio.iscoroutine(res):
                         await res
+                    if one_shot:
+                        break
                 except Exception as e:
                     logger.error(f"Scheduled task {name} failed: {e}")
         if name not in self._tasks:

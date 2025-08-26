@@ -126,6 +126,7 @@ class BuddyAuthManager:
                               user_id: str, 
                               device_id: str, 
                               device_type: DeviceType,
+                              roles: Optional[List[str]] = None,
                               additional_claims: Dict = None) -> str:
         """
         Generate a short-lived JWT access token
@@ -152,6 +153,8 @@ class BuddyAuthManager:
             "aud": "buddy-api"
         }
         
+        if roles:
+            claims["roles"] = roles
         if additional_claims:
             claims.update(additional_claims)
         
@@ -175,7 +178,8 @@ class BuddyAuthManager:
                                device_type: DeviceType,
                                device_name: str,
                                user_agent: str = "",
-                               ip_address: str = "") -> TokenPair:
+                               ip_address: str = "",
+                               roles: Optional[List[str]] = None) -> TokenPair:
         """
         Authenticate user and create new token pair
         
@@ -192,7 +196,7 @@ class BuddyAuthManager:
         """
         try:
             # Generate tokens
-            access_token = self._generate_access_token(user_id, device_id, device_type)
+            access_token = self._generate_access_token(user_id, device_id, device_type, roles=roles)
             refresh_token = self._generate_refresh_token()
             hashed_refresh_token = self._hash_refresh_token(refresh_token)
             

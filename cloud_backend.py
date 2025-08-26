@@ -247,7 +247,7 @@ async def readiness():
     return {"ready": True}
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(message_data: ChatMessage):
+async def chat(message_data: ChatMessage, credentials: HTTPAuthorizationCredentials = Depends()):
     """Main chat endpoint"""
     try:
         start_time = time.time()
@@ -330,7 +330,10 @@ async def create_reminder(reminder: ReminderRequest, credentials: HTTPAuthorizat
         if delay > 0:
             def trigger():
                 logger.info("reminder_due", id=reminder_id, title=reminder.title)
-            scheduler.schedule_interval(f"reminder_{reminder_id}", int(delay), trigger)  # one-shot simulated via interval
+                # mark in-memory reminder complete
+                if reminder_id in memory_storage["reminders"]:
+                    memory_storage["reminders"][reminder_id]["status"] = "completed"
+            scheduler.schedule_interval(f"reminder_{reminder_id}", int(delay), trigger, one_shot=True)
         
         if MONGODB_AVAILABLE:
             db = await get_database()

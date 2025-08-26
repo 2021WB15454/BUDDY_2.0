@@ -24,6 +24,7 @@ class LoginRequest(BaseModel):
     device_id: str = Field(..., min_length=5, max_length=100)
     device_type: str = Field(..., pattern="^(ios|android|desktop|smartwatch|tv|car|web)$")
     device_name: str = Field(..., min_length=1, max_length=100)
+    roles: Optional[List[str]] = Field(default=None, description="Optional role claims")
 
 class RefreshRequest(BaseModel):
     """Token refresh request model"""
@@ -144,7 +145,8 @@ class BuddyAuthAPI:
                 device_type=device_type,
                 device_name=login_data.device_name,
                 user_agent=user_agent,
-                ip_address=ip_address
+                ip_address=ip_address,
+                roles=login_data.roles or ["user"]
             )
             
             logger.info(f"User {user_id} logged in successfully from device {login_data.device_id}")
