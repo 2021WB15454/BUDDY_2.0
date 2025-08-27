@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Information -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>BUDDY Voice</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    
+    <!-- Minimum OS Version -->
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    
+    <!-- App Category -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
+    
+    <!-- Privacy Permissions -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>BUDDY needs microphone access for voice commands and wake word detection.</string>
+    
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>BUDDY uses speech recognition to understand your voice commands.</string>
+    
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>BUDDY connects to local servers for enhanced AI capabilities.</string>
+    
+    <!-- Background Modes -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+        <string>background-processing</string>
+        <string>background-fetch</string>
+    </array>
+    
+    <!-- Audio Configuration -->
+    <key>AVAudioSessionCategory</key>
+    <string>AVAudioSessionCategoryPlayAndRecord</string>
+    
+    <key>AVAudioSessionCategoryOptions</key>
+    <array>
+        <string>AVAudioSessionCategoryOptionDefaultToSpeaker</string>
+        <string>AVAudioSessionCategoryOptionAllowBluetooth</string>
+        <string>AVAudioSessionCategoryOptionInterruptSpokenAudioAndMixWithOthers</string>
+    </array>
+    
+    <!-- Required Device Capabilities -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>microphone</string>
+        <string>audio-output</string>
+    </array>
+    
+    <!-- Supported Interface Orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <!-- App Transport Security -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+    
+    <!-- Voice Processing Configuration -->
+    <key>BuddyVoiceConfiguration</key>
+    <dict>
+        <key>WakeWordKeyword</key>
+        <string>hey_buddy</string>
+        <key>SampleRate</key>
+        <integer>16000</integer>
+        <key>Channels</key>
+        <integer>1</integer>
+        <key>BitDepth</key>
+        <integer>16</integer>
+        <key>BufferSize</key>
+        <integer>1600</integer>
+        <key>EnableHapticFeedback</key>
+        <true/>
+        <key>EnableBackgroundProcessing</key>
+        <true/>
+    </dict>
+    
+    <!-- Siri Integration -->
+    <key>NSUserActivityTypes</key>
+    <array>
+        <string>ai.buddy.voice.interaction</string>
+        <string>ai.buddy.voice.command</string>
+    </array>
+    
+    <!-- App Icon -->
+    <key>CFBundleIcons</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon</string>
+            </array>
+        </dict>
+    </dict>
+    
+    <!-- Launch Screen -->
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+    
+    <!-- Scene Configuration (iOS 13+) -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>Default Configuration</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+                    <key>UISceneStoryboardFile</key>
+                    <string>Main</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
+    
+    <!-- CarPlay Support -->
+    <key>UIApplicationSupportsCarPlay</key>
+    <true/>
+    
+    <!-- Voice Over Support -->
+    <key>UIAccessibilityEnabled</key>
+    <true/>
+    
+    <!-- Background Processing Identifiers -->
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>ai.buddy.voice.background.refresh</string>
+        <string>ai.buddy.voice.wake.monitor</string>
+    </array>
+    
+    <!-- File Provider Extension -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.audio</string>
+            </array>
+            <key>UTTypeDescription</key>
+            <string>BUDDY Voice Recording</string>
+            <key>UTTypeIdentifier</key>
+            <string>ai.buddy.voice.recording</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>buddy</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
+</dict>
+</plist>

@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUDDY Desktop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e1e;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .titlebar {
+            height: 32px;
+            background: #323233;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            border-bottom: 1px solid #464647;
+            -webkit-app-region: drag;
+        }
+
+        .titlebar-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #cccccc;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        .control-button {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+        }
+
+        .close { background: #ff5f57; }
+        .minimize { background: #ffbd2e; }
+        .maximize { background: #28ca42; }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 32px);
+        }
+
+        .sidebar {
+            width: 280px;
+            background: #252526;
+            border-right: 1px solid #464647;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #464647;
+        }
+
+        .app-logo {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .logo-icon {
+            font-size: 32px;
+            margin-right: 12px;
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .version-badge {
+            background: #007acc;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 8px;
+        }
+
+        .status-panel {
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28ca42;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .feature-section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #cccccc;
+        }
+
+        .feature-list {
+            list-style: none;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 13px;
+            color: #cccccc;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 2px;
+        }
+
+        .feature-item:hover {
+            background: #2a2d2e;
+            padding-left: 8px;
+            transition: all 0.2s;
+        }
+
+        .feature-icon {
+            margin-right: 10px;
+            font-size: 16px;
+        }
+
+        .metrics-section {
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: #4fc3f7;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e1e;
+        }
+
+        .chat-header {
+            background: #2d2d30;
+            border-bottom: 1px solid #464647;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .chat-subtitle {
+            font-size: 12px;
+            color: #cccccc;
+            margin-top: 2px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .header-button:hover {
+            background: #005a9e;
+        }
+
+        .header-button.secondary {
+            background: #464647;
+        }
+
+        .header-button.secondary:hover {
+            background: #5a5a5c;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message-group {
+            margin-bottom: 25px;
+        }
+
+        .message {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            margin: 0 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: #007acc;
+            color: white;
+        }
+
+        .message.buddy .message-avatar {
+            background: #28ca42;
+            color: white;
+        }
+
+        .message-content {
+            flex: 1;
+            max-width: 70%;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: #cccccc;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .message-time {
+            color: #888;
+        }
+
+        .message-body {
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 8px;
+            padding: 12px 15px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-body {
+            background: #007acc;
+            border-color: #007acc;
+        }
+
+        .message-metadata {
+            margin-top: 6px;
+            font-size: 11px;
+            color: #888;
+        }
+
+        .metadata-tag {
+            display: inline-block;
+            background: #464647;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 6px;
+        }
+
+        .metadata-tag.success {
+            background: #28ca42;
+            color: white;
+        }
+
+        .input-area {
+            background: #2d2d30;
+            border-top: 1px solid #464647;
+            padding: 15px 20px;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .message-input {
+            width: 100%;
+            background: #1e1e1e;
+            border: 1px solid #464647;
+            border-radius: 6px;
+            padding: 12px 15px;
+            color: white;
+            font-size: 14px;
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .message-input:focus {
+            border-color: #007acc;
+        }
+
+        .message-input::placeholder {
+            color: #888;
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-button {
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .send-button {
+            background: #007acc;
+            color: white;
+        }
+
+        .send-button:hover {
+            background: #005a9e;
+            transform: scale(1.05);
+        }
+
+        .send-button:disabled {
+            background: #464647;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .attach-button {
+            background: #464647;
+            color: #cccccc;
+        }
+
+        .attach-button:hover {
+            background: #5a5a5c;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            padding: 0 20px;
+            margin-bottom: 15px;
+        }
+
+        .typing-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            background: #28ca42;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .typing-content {
+            display: flex;
+            align-items: center;
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 8px;
+            padding: 12px 15px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+            margin-right: 10px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #888;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.4; }
+            30% { opacity: 1; }
+        }
+
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: #cccccc;
+        }
+
+        .welcome-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .welcome-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .welcome-text {
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 400px;
+            margin-bottom: 30px;
+        }
+
+        .quick-starts {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .quick-start {
+            background: #2d2d30;
+            border: 1px solid #464647;
+            border-radius: 6px;
+            padding: 12px 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+
+        .quick-start:hover {
+            background: #383839;
+            border-color: #007acc;
+        }
+    </style>
+</head>
+<body>
+    <div class="titlebar">
+        <div class="titlebar-title">BUDDY Desktop Assistant</div>
+        <div class="window-controls">
+            <button class="control-button close"></button>
+            <button class="control-button minimize"></button>
+            <button class="control-button maximize"></button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="app-logo">
+                    <div class="logo-icon">🤖</div>
+                    <div class="logo-text">BUDDY</div>
+                    <div class="version-badge">2.0</div>
+                </div>
+                
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span>Connection</span>
+                        <div class="status-indicator" id="connectionStatus"></div>
+                    </div>
+                    <div class="status-item">
+                        <span>Cross-Platform Sync</span>
+                        <div class="status-indicator" id="syncStatus"></div>
+                    </div>
+                    <div class="status-item">
+                        <span>Desktop Mode</span>
+                        <div class="status-indicator"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-content">
+                <div class="feature-section">
+                    <div class="section-title">🚀 Enhanced Features</div>
+                    <ul class="feature-list">
+                        <li class="feature-item">
+                            <span class="feature-icon">🔄</span>
+                            <span>Real-time Synchronization</span>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-icon">📊</span>
+                            <span>Performance Metrics</span>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-icon">🖥️</span>
+                            <span>Desktop Optimization</span>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-icon">⚡</span>
+                            <span>Enhanced Intelligence</span>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-icon">🔒</span>
+                            <span>Secure Communication</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="feature-section">
+                    <div class="section-title">📈 Performance Metrics</div>
+                    <div class="metrics-section">
+                        <div class="metric-item">
+                            <span>Memory Summary</span>
+                            <span class="metric-value" id="memoryLatency">Loading...</span>
+                        </div>
+                        <div class="metric-item">
+                            <span>Publish Latency</span>
+                            <span class="metric-value" id="publishLatency">Loading...</span>
+                        </div>
+                        <div class="metric-item">
+                            <span>Messages Processed</span>
+                            <span class="metric-value" id="messageCount">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-area">
+            <div class="chat-header">
+                <div>
+                    <div class="chat-title">Enhanced AI Assistant</div>
+                    <div class="chat-subtitle">Desktop optimized with full feature access</div>
+                </div>
+                <div class="header-controls">
+                    <button class="header-button secondary" onclick="clearChat()">Clear</button>
+                    <button class="header-button" onclick="toggleMetrics()">Metrics</button>
+                </div>
+            </div>
+
+            <div class="messages-container" id="messagesContainer">
+                <div class="welcome-screen">
+                    <div class="welcome-icon">👋</div>
+                    <div class="welcome-title">Welcome to BUDDY Desktop</div>
+                    <div class="welcome-text">
+                        Your enhanced AI assistant optimized for desktop productivity.
+                        Access all advanced features including real-time sync, performance monitoring, and intelligent responses.
+                    </div>
+                    <div class="quick-starts">
+                        <div class="quick-start" onclick="quickMessage('Hello BUDDY! Show me your capabilities')">🚀 Explore Features</div>
+                        <div class="quick-start" onclick="quickMessage('What performance metrics are available?')">📊 View Metrics</div>
+                        <div class="quick-start" onclick="quickMessage('How does cross-platform sync work?')">🔄 Sync Info</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-avatar">🤖</div>
+                <div class="typing-content">
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                    <span>BUDDY is processing your request...</span>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <textarea 
+                            class="message-input" 
+                            id="messageInput" 
+                            placeholder="Type your message to BUDDY..."
+                            onkeydown="handleKeyDown(event)"
+                        ></textarea>
+                    </div>
+                    <div class="input-actions">
+                        <button class="action-button attach-button" title="Attach file">📎</button>
+                        <button class="action-button send-button" id="sendButton" onclick="sendMessage()" title="Send message">➤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let messageCount = 0;
+        let isConnected = true;
+        const BUDDY_API = 'http://localhost:8081';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateConnectionStatus(true);
+            loadMetrics();
+            setInterval(loadMetrics, 5000); // Refresh metrics every 5 seconds
+        });
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function quickMessage(message) {
+            document.getElementById('messageInput').value = message;
+            sendMessage();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Clear input and disable send button
+            input.value = '';
+            document.getElementById('sendButton').disabled = true;
+            
+            // Add user message
+            addMessage('user', message);
+            messageCount++;
+            updateMessageCount();
+            
+            // Show typing indicator
+            showTypingIndicator(true);
+            
+            const startTime = Date.now();
+            
+            try {
+                const response = await fetch(`${BUDDY_API}/chat/universal`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        device_type: 'desktop',
+                        user_id: 'desktop_user_' + Date.now(),
+                        capabilities: {
+                            screen_size: 'large',
+                            keyboard_input: true,
+                            multi_window: true,
+                            full_features: true
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                const responseTime = Date.now() - startTime;
+                
+                setTimeout(() => {
+                    showTypingIndicator(false);
+                    addMessage('buddy', data.response, {
+                        platform_optimized: data.platform_optimized,
+                        sync_completed: data.sync_completed,
+                        response_time: responseTime
+                    });
+                    messageCount++;
+                    updateMessageCount();
+                    updateConnectionStatus(true);
+                }, 1000);
+                
+            } catch (error) {
+                showTypingIndicator(false);
+                addMessage('buddy', 'Connection error. Please ensure BUDDY server is running on http://localhost:8081', {
+                    error: true
+                });
+                updateConnectionStatus(false);
+            }
+            
+            document.getElementById('sendButton').disabled = false;
+        }
+
+        function addMessage(sender, content, metadata = {}) {
+            const container = document.getElementById('messagesContainer');
+            const welcomeScreen = container.querySelector('.welcome-screen');
+            
+            if (welcomeScreen) {
+                welcomeScreen.remove();
+            }
+            
+            const messageGroup = document.createElement('div');
+            messageGroup.className = 'message-group';
+            
+            const message = document.createElement('div');
+            message.className = `message ${sender}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = sender === 'user' ? 'U' : '🤖';
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            
+            const messageHeader = document.createElement('div');
+            messageHeader.className = 'message-header';
+            messageHeader.innerHTML = `
+                <span class="message-sender">${sender === 'user' ? 'You' : 'BUDDY'}</span>
+                <span class="message-time">${new Date().toLocaleTimeString()}</span>
+            `;
+            
+            const messageBody = document.createElement('div');
+            messageBody.className = 'message-body';
+            messageBody.textContent = content;
+            
+            messageContent.appendChild(messageHeader);
+            messageContent.appendChild(messageBody);
+            
+            if (Object.keys(metadata).length > 0) {
+                const metadataDiv = document.createElement('div');
+                metadataDiv.className = 'message-metadata';
+                
+                if (metadata.platform_optimized) {
+                    const tag = document.createElement('span');
+                    tag.className = 'metadata-tag success';
+                    tag.textContent = '🖥️ Desktop Optimized';
+                    metadataDiv.appendChild(tag);
+                }
+                
+                if (metadata.sync_completed) {
+                    const tag = document.createElement('span');
+                    tag.className = 'metadata-tag success';
+                    tag.textContent = '✓ Synced';
+                    metadataDiv.appendChild(tag);
+                }
+                
+                if (metadata.response_time) {
+                    const tag = document.createElement('span');
+                    tag.className = 'metadata-tag';
+                    tag.textContent = `⚡ ${metadata.response_time}ms`;
+                    metadataDiv.appendChild(tag);
+                }
+                
+                if (metadata.error) {
+                    const tag = document.createElement('span');
+                    tag.className = 'metadata-tag';
+                    tag.style.background = '#ff5f57';
+                    tag.textContent = '⚠ Error';
+                    metadataDiv.appendChild(tag);
+                }
+                
+                messageContent.appendChild(metadataDiv);
+            }
+            
+            message.appendChild(avatar);
+            message.appendChild(messageContent);
+            messageGroup.appendChild(message);
+            
+            container.appendChild(messageGroup);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showTypingIndicator(show) {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = show ? 'flex' : 'none';
+            
+            if (show) {
+                const container = document.getElementById('messagesContainer');
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            document.getElementById('connectionStatus').style.background = connected ? '#28ca42' : '#ff5f57';
+            document.getElementById('syncStatus').style.background = connected ? '#28ca42' : '#ff5f57';
+        }
+
+        function updateMessageCount() {
+            document.getElementById('messageCount').textContent = messageCount;
+        }
+
+        async function loadMetrics() {
+            try {
+                const response = await fetch(`${BUDDY_API}/system/intel-metrics`);
+                const data = await response.json();
+                
+                const metrics = data.intelligence_metrics;
+                document.getElementById('memoryLatency').textContent = `${metrics.memory_summary_latency.avg_ms.toFixed(1)}ms`;
+                document.getElementById('publishLatency').textContent = `${metrics.publish_latency.avg_ms.toFixed(1)}ms`;
+                
+            } catch (error) {
+                document.getElementById('memoryLatency').textContent = 'N/A';
+                document.getElementById('publishLatency').textContent = 'N/A';
+            }
+        }
+
+        function clearChat() {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = `
+                <div class="welcome-screen">
+                    <div class="welcome-icon">🔄</div>
+                    <div class="welcome-title">Chat Cleared</div>
+                    <div class="welcome-text">Ready for a new conversation!</div>
+                </div>
+            `;
+            messageCount = 0;
+            updateMessageCount();
+        }
+
+        function toggleMetrics() {
+            loadMetrics();
+            alert('Metrics refreshed! Check the sidebar for updated performance data.');
+        }
+
+        // Auto-resize textarea
+        document.getElementById('messageInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+    </script>
+</body>
+</html>

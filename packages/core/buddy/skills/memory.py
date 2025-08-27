@@ -6,9 +6,8 @@ It allows BUDDY to remember and recall information from past conversations.
 """
 
 import logging
-import asyncio
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
+from datetime import datetime
 import uuid
 import os
 import sys
@@ -16,52 +15,23 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Try different import strategies
-MEMORY_SKILL_AVAILABLE = False
-BaseSkill = None
-SkillResult = None
-SkillSchema = None
-PineconeClient = None
-
 try:
-    # First try relative imports (when run as part of package)
-    from ..skills import BaseSkill, SkillResult, SkillSchema
+    from .base import BaseSkill, SkillResult, SkillSchema
     from ..database.pinecone_client import (
-        PineconeClient, VectorDocument, SearchResult,
-        create_memory_document, create_knowledge_document
+        PineconeClient, create_memory_document, create_knowledge_document
     )
     MEMORY_SKILL_AVAILABLE = True
-    logger.info("Memory skill imports loaded via relative imports")
-except ImportError:
-    try:
-        # Try absolute imports (when run directly)
-        from packages.core.buddy.skills import BaseSkill, SkillResult, SkillSchema
-        from packages.core.buddy.database.pinecone_client import (
-            PineconeClient, VectorDocument, SearchResult,
-            create_memory_document, create_knowledge_document
-        )
-        MEMORY_SKILL_AVAILABLE = True
-        logger.info("Memory skill imports loaded via absolute imports")
-    except ImportError:
-        try:
-            # Try local imports (fallback)
-            sys.path.insert(0, str(Path(__file__).parent))
-            sys.path.insert(0, str(Path(__file__).parent.parent))
-            from skills import BaseSkill, SkillResult, SkillSchema
-            from database.pinecone_client import (
-                PineconeClient, VectorDocument, SearchResult,
-                create_memory_document, create_knowledge_document
-            )
-            MEMORY_SKILL_AVAILABLE = True
-            logger.info("Memory skill imports loaded via local imports")
-        except ImportError as e:
-            # Fallback - disable memory skill if dependencies not available
-            logger.warning(f"Memory skill dependencies not available: {e}")
-            BaseSkill = object  # Fallback base class
-            SkillResult = dict
-            SkillSchema = dict
-            PineconeClient = None
-            MEMORY_SKILL_AVAILABLE = False
+except Exception as e:
+    MEMORY_SKILL_AVAILABLE = False
+    class BaseSkill:  # minimal stub
+        async def initialize(self): return False
+    class SkillResult(dict):
+        def __init__(self, **kw): super().__init__(**kw)
+    class SkillSchema(dict): pass
+    PineconeClient = None  # type: ignore
+    def create_memory_document(*a, **k): raise RuntimeError("memory disabled")
+    def create_knowledge_document(*a, **k): raise RuntimeError("memory disabled")
+    logger.warning(f"Memory skill disabled: {e}")
 
 class MemorySkill(BaseSkill):
     """
@@ -80,32 +50,18 @@ class MemorySkill(BaseSkill):
             return
             
         super().__init__(event_bus)
-        self.pinecone_client: Optional[PineconeClient] = None
+    self.pinecone_client = None
         self.enabled = False
     
     async def initialize(self) -> bool:
         """Initialize the memory skill with Pinecone"""
         try:
             # Set up schema first
-            self.schema = SkillSchema(
-                name="memory",
-                version="1.0.0",
-                description="Long-term memory and knowledge storage using vector database",
-                input_schema={"type": "object", "properties": {"query": {"type": "string"}}},
-                output_schema={"type": "object", "properties": {"text": {"type": "string"}}},
-                category="memory",
-                permissions=["memory_read", "memory_write"],
-                requires_online=True,
-                timeout_ms=10000
-            )
+            self.schema = SkillSchema(name="memory", version="1.0.0", description="Long-term memory via Pinecone")
             
             # Initialize Pinecone client
-            self.pinecone_client = PineconeClient(
-                index_name="buddy-memory",
-                embedding_model="all-MiniLM-L6-v2"
-            )
-            
-            await self.pinecone_client.initialize()
+            self.pinecone_client = PineconeClient(index_name="buddy-memory", embedding_model="all-MiniLM-L6-v2")  # type: ignore
+            await self.pinecone_client.initialize()  # type: ignore
             self.enabled = True
             
             logger.info("✅ Memory skill initialized with Pinecone")
@@ -117,7 +73,7 @@ class MemorySkill(BaseSkill):
             self.enabled = False
             return False
     
-    async def execute(self, parameters: Dict[str, Any], context: Dict[str, Any]) -> SkillResult:
+    async def execute(self, parameters: Dict[str, Any], context: Dict[str, Any]):
         """
         Execute memory-related operations
         
@@ -128,10 +84,7 @@ class MemorySkill(BaseSkill):
         - "Store this information: [knowledge]"
         """
         if not self.enabled or not self.pinecone_client:
-            return SkillResult(
-                success=False,
-                error_result_metadata="Memory functionality is not available"
-            )
+            return SkillResult(success=False, result_metadata="Memory functionality is not available")
         
         query = parameters.get("query", "")
         query_lower = query.lower().strip()
@@ -167,10 +120,7 @@ class MemorySkill(BaseSkill):
             content_to_store = self._extract_memory_content(query)
             
             if not content_to_store:
-                return SkillResult(
-                    success=False,
-                    error_result_metadata="I didn't understand what you want me to remember. Please be more specific."
-                )
+                return SkillResult(success=False, result_metadata="I didn't understand what you want me to remember. Please be more specific.")
             
             # Create memory document
             user_id = context.get("user_id", "default")
@@ -180,7 +130,7 @@ class MemorySkill(BaseSkill):
                 text=content_to_store,
                 conversation_id=conversation_id,
                 user_id=user_id,
-                additional_metametadata={
+                additional_metadata={
                     "original_query": query,
                     "memory_type": "user_request"
                 }
@@ -190,28 +140,13 @@ class MemorySkill(BaseSkill):
             success = await self.pinecone_client.store_document(memory_doc)
             
             if success:
-                return SkillResult(
-                    success=True,
-                    result_metadata=f"I'll remember that: {content_to_store}",
-                    metadata={
-                        "stored_content": content_to_store,
-                        "memory_id": memory_doc.id
-                    }
-                )
+                return SkillResult(success=True, result_metadata=f"I'll remember that: {content_to_store}", metadata={"stored_content": content_to_store, "memory_id": memory_doc.id})
             else:
-                return SkillResult(
-                    success=False,
-                    result_metadata="I had trouble storing that memory. Please try again.",
-                    metadata={}
-                )
+                return SkillResult(success=False, result_metadata="I had trouble storing that memory. Please try again.", metadata={})
                 
         except Exception as e:
             logger.error(f"Error storing memory: {e}")
-            return SkillResult(
-                success=False,
-                result_metadata="An error occurred while storing the memory",
-                metadata={"error": str(e)}
-            )
+            return SkillResult(success=False, result_metadata="An error occurred while storing the memory", metadata={"error": str(e)})
     
     async def _recall_memories(self, query: str, context: Dict[str, Any]) -> SkillResult:
         """Recall relevant memories based on the query"""
@@ -219,7 +154,7 @@ class MemorySkill(BaseSkill):
             user_id = context.get("user_id", "default")
             
             # Search for relevant memories
-            search_results = await self.pinecone_client.search(
+            search_results = await self.pinecone_client.search(  # type: ignore[attr-defined]
                 query=query,
                 top_k=5,
                 filter_dict={"user_id": user_id},
@@ -270,7 +205,7 @@ class MemorySkill(BaseSkill):
         """Search the knowledge base"""
         try:
             # Search for knowledge documents
-            search_results = await self.pinecone_client.search(
+            search_results = await self.pinecone_client.search(  # type: ignore[attr-defined]
                 query=query,
                 top_k=3,
                 filter_dict={"type": "knowledge"},
@@ -322,7 +257,7 @@ class MemorySkill(BaseSkill):
             user_id = context.get("user_id", "default")
             
             # Search for relevant memories
-            search_results = await self.pinecone_client.search(
+            search_results = await self.pinecone_client.search(  # type: ignore[attr-defined]
                 query=query,
                 top_k=3,
                 filter_dict={"user_id": user_id},
@@ -427,7 +362,7 @@ class MemorySkill(BaseSkill):
                 text=memory_content,
                 conversation_id=conversation_id,
                 user_id=user_id,
-                additional_metametadata={
+                                                additional_metadata={
                     "memory_type": "conversation_exchange",
                     "user_message": user_message,
                     "assistant_response": assistant_response
@@ -472,7 +407,7 @@ class MemorySkill(BaseSkill):
                 text=content,
                 title=title,
                 category=category,
-                additional_metametadata=metadata
+                                    additional_metadata=metadata
             )
             
             # Store in Pinecone

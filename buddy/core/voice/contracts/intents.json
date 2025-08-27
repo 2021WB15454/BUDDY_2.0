@@ -1,0 +1,176 @@
+{
+  "intents": {
+    "greeting": {
+      "keywords": ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"],
+      "responses": [
+        "Hello! How can I help you today?",
+        "Hi there! What would you like me to do?",
+        "Good to see you! How may I assist?"
+      ]
+    },
+    "email": {
+      "keywords": ["email", "mail", "send message", "compose", "write"],
+      "responses": [
+        "I'll help you with your email. What would you like to do?",
+        "Email assistance ready. Who would you like to message?",
+        "Let's handle your email. What's the task?"
+      ]
+    },
+    "time": {
+      "keywords": ["time", "what time", "clock", "hour"],
+      "responses": [
+        "The current time is {current_time}.",
+        "It's {current_time} right now.",
+        "The time is {current_time}."
+      ]
+    },
+    "weather": {
+      "keywords": ["weather", "temperature", "forecast", "rain", "sunny"],
+      "responses": [
+        "Let me check the weather for you.",
+        "I'll get the current weather conditions.",
+        "Weather information coming up."
+      ]
+    },
+    "devices": {
+      "keywords": ["devices", "connected", "phone", "watch", "car", "status"],
+      "responses": [
+        "Here are your connected devices.",
+        "Let me check your device status.",
+        "Showing your device information."
+      ]
+    },
+    "reminder": {
+      "keywords": ["remind", "reminder", "schedule", "appointment", "meeting"],
+      "responses": [
+        "I'll set that reminder for you.",
+        "Reminder created. I'll let you know.",
+        "Got it. I'll remind you about that."
+      ]
+    },
+    "music": {
+      "keywords": ["music", "play", "song", "artist", "album", "spotify"],
+      "responses": [
+        "Let me control your music.",
+        "Music control ready. What would you like to hear?",
+        "I'll help with your music playback."
+      ]
+    },
+    "navigation": {
+      "keywords": ["navigate", "directions", "route", "drive", "map"],
+      "responses": [
+        "I'll help with navigation.",
+        "Where would you like to go?",
+        "Navigation assistance ready."
+      ]
+    },
+    "smart_home": {
+      "keywords": ["lights", "temperature", "thermostat", "lock", "door", "home"],
+      "responses": [
+        "I'll control your smart home devices.",
+        "Smart home control ready.",
+        "What would you like me to adjust?"
+      ]
+    },
+    "help": {
+      "keywords": ["help", "what can you do", "commands", "features"],
+      "responses": [
+        "I can help with email, reminders, weather, music, smart home, and more. What would you like to try?",
+        "I'm your AI assistant. I can handle emails, check weather, set reminders, control devices, and much more.",
+        "Here's what I can do: manage email, check weather, set reminders, control music, help with navigation, and control smart home devices."
+      ]
+    },
+    "goodbye": {
+      "keywords": ["goodbye", "bye", "see you", "talk later", "stop"],
+      "responses": [
+        "Goodbye! I'll be here when you need me.",
+        "See you later! Just say 'Hey Buddy' to chat again.",
+        "Take care! I'm always ready to help."
+      ]
+    },
+    "unknown": {
+      "keywords": [],
+      "responses": [
+        "I'm not sure about that. Could you rephrase?",
+        "I didn't quite understand. Can you try saying it differently?",
+        "Let me connect you to BUDDY's brain for a better response.",
+        "I'm processing that request. One moment please."
+      ]
+    }
+  },
+  "wake_words": {
+    "primary": "hey buddy",
+    "alternatives": ["buddy", "hey b", "ok buddy"],
+    "sensitivity": 0.6,
+    "timeout_ms": 5000
+  },
+  "session_config": {
+    "silence_timeout_ms": 4000,
+    "max_session_duration_ms": 30000,
+    "partial_results": true,
+    "auto_restart_wake": true
+  },
+  "audio_config": {
+    "sample_rate": 16000,
+    "channels": 1,
+    "bit_depth": 16,
+    "buffer_size": 2048,
+    "format": "pcm_s16le"
+  },
+  "languages": {
+    "supported": ["en-US", "en-GB", "es-ES", "fr-FR", "de-DE"],
+    "default": "en-US",
+    "models": {
+      "en-US": "models/en-us/vosk-model-small-en-us-0.15.zip",
+      "en-GB": "models/en-gb/vosk-model-small-en-gb-0.15.zip",
+      "es-ES": "models/es/vosk-model-small-es-0.42.zip",
+      "fr-FR": "models/fr/vosk-model-small-fr-0.22.zip",
+      "de-DE": "models/de/vosk-model-small-de-0.15.zip"
+    }
+  },
+  "platform_specific": {
+    "android": {
+      "min_api_level": 21,
+      "audio_source": "VOICE_RECOGNITION",
+      "foreground_service": true,
+      "notification_channel": "buddy_voice"
+    },
+    "ios": {
+      "min_version": "14.0",
+      "audio_category": "playAndRecord",
+      "background_modes": ["audio"],
+      "privacy_usage": "BUDDY uses the microphone for voice commands"
+    },
+    "wear_os": {
+      "short_sessions": true,
+      "tile_integration": true,
+      "power_optimization": true
+    },
+    "watch_os": {
+      "complication_trigger": true,
+      "digital_crown_control": true,
+      "haptic_feedback": true
+    }
+  },
+  "error_handling": {
+    "max_retries": 3,
+    "fallback_responses": [
+      "I'm having trouble with voice recognition. Please try again.",
+      "Sorry, I didn't catch that. Could you repeat?",
+      "Voice processing error. Let me restart and try again."
+    ],
+    "offline_mode": {
+      "enabled": true,
+      "local_responses": true,
+      "cached_intents": true
+    }
+  },
+  "performance": {
+    "wake_detection_latency_ms": 500,
+    "stt_startup_latency_ms": 200,
+    "tts_startup_latency_ms": 300,
+    "end_to_end_latency_ms": 3000,
+    "memory_limit_mb": 100,
+    "battery_optimization": true
+  }
+}

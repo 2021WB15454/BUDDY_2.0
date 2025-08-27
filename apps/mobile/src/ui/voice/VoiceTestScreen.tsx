@@ -478,3 +478,46 @@ const styles = StyleSheet.create({
 });
 
 export default VoiceTestScreen;
+export interface STTResult {
+  text: string;
+  confidence: number;
+  isFinal: boolean;
+  timestamp: number;
+}
+
+export interface VoiceService {
+  startListening(): Promise<void>;
+  stopListening(): Promise<void>;
+  isListening(): boolean;
+  onResult(callback: (result: STTResult) => void): void;
+  onError(callback: (error: Error) => void): void;
+}
+
+class VoiceServiceImpl implements VoiceService {
+  private listening = false;
+  private resultCallback?: (result: STTResult) => void;
+  private errorCallback?: (error: Error) => void;
+
+  async startListening(): Promise<void> {
+    this.listening = true;
+    // TODO: Implement native voice recognition
+  }
+
+  async stopListening(): Promise<void> {
+    this.listening = false;
+  }
+
+  isListening(): boolean {
+    return this.listening;
+  }
+
+  onResult(callback: (result: STTResult) => void): void {
+    this.resultCallback = callback;
+  }
+
+  onError(callback: (error: Error) => void): void {
+    this.errorCallback = callback;
+  }
+}
+
+export const voiceService = new VoiceServiceImpl();

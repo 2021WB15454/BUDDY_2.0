@@ -11,9 +11,11 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/eventemitter3": "^1.2.0",
     "electron": "^37.3.1"
   },
   "dependencies": {
-    "axios": "^1.11.0"
+    "axios": "^1.11.0",
+    "eventemitter3": "^5.0.1"
   }
 }

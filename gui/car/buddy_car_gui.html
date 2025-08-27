@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUDDY CarPlay</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .car-interface {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .status-bar {
+            height: 60px;
+            background: linear-gradient(90deg, #000 0%, #1a1a1a 50%, #000 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            border-bottom: 2px solid #333;
+        }
+
+        .vehicle-status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-icon {
+            font-size: 18px;
+        }
+
+        .speed-display {
+            font-size: 24px;
+            font-weight: 700;
+            color: #4fc3f7;
+        }
+
+        .main-display {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .left-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .center-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .right-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #4fc3f7;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .voice-control {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .voice-button {
+            width: 120px;
+            height: 120px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 48px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .voice-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        .voice-button:active {
+            transform: scale(0.95);
+        }
+
+        .voice-button.listening {
+            background: linear-gradient(135deg, #ff5f57 0%, #ff8a65 100%);
+            animation: voice-pulse 1.5s infinite;
+        }
+
+        @keyframes voice-pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 10px 30px rgba(255, 95, 87, 0.3);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 20px 50px rgba(255, 95, 87, 0.6);
+            }
+        }
+
+        .voice-status {
+            margin-top: 15px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .voice-instructions {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #cccccc;
+            line-height: 1.4;
+        }
+
+        .quick-commands {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .quick-command {
+            background: rgba(79, 195, 247, 0.2);
+            border: 1px solid rgba(79, 195, 247, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .quick-command:hover {
+            background: rgba(79, 195, 247, 0.3);
+            border-color: rgba(79, 195, 247, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .quick-command-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .conversation-display {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .conversation-message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .conversation-message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .conversation-message.user .message-avatar {
+            background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+        }
+
+        .conversation-message.buddy .message-avatar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .message-content {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px 20px;
+            font-size: 16px;
+            line-height: 1.5;
+            max-width: 70%;
+        }
+
+        .conversation-message.user .message-content {
+            background: rgba(79, 195, 247, 0.2);
+            border: 1px solid rgba(79, 195, 247, 0.3);
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        .conversation-message.buddy .message-time {
+            text-align: left;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .typing-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .typing-content {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #888;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.4; }
+            30% { opacity: 1; }
+        }
+
+        .navigation-info {
+            margin-bottom: 20px;
+        }
+
+        .nav-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+        }
+
+        .nav-item:last-child {
+            border-bottom: none;
+        }
+
+        .nav-label {
+            color: #cccccc;
+        }
+
+        .nav-value {
+            font-weight: 600;
+            color: #4fc3f7;
+        }
+
+        .safety-alerts {
+            background: rgba(255, 95, 87, 0.1);
+            border: 1px solid rgba(255, 95, 87, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .alert-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .alert-icon {
+            font-size: 18px;
+            color: #ff5f57;
+        }
+
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+
+        .welcome-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        .welcome-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .welcome-text {
+            font-size: 16px;
+            color: #cccccc;
+            line-height: 1.6;
+            max-width: 400px;
+        }
+
+        .emergency-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 80px;
+            height: 80px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff5f57 0%, #ff8a65 100%);
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(255, 95, 87, 0.4);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .emergency-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 40px rgba(255, 95, 87, 0.6);
+        }
+
+        .connection-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .connection-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #28ca42;
+        }
+
+        .connection-dot.disconnected {
+            background: #ff5f57;
+        }
+    </style>
+</head>
+<body>
+    <div class="car-interface">
+        <div class="status-bar">
+            <div class="vehicle-status">
+                <div class="status-item">
+                    <span class="status-icon">🚗</span>
+                    <span>Park</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon">⛽</span>
+                    <span>75%</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon">🌡️</span>
+                    <span>72°F</span>
+                </div>
+            </div>
+            
+            <div class="speed-display">0 MPH</div>
+            
+            <div class="connection-indicator">
+                <div class="connection-dot" id="connectionDot"></div>
+                <span>BUDDY Connected</span>
+            </div>
+        </div>
+
+        <div class="main-display">
+            <div class="left-panel">
+                <div class="panel-title">
+                    <span>🎤</span>
+                    Voice Assistant
+                </div>
+                
+                <div class="voice-control">
+                    <button class="voice-button" id="voiceButton" onclick="toggleVoiceControl()">🎤</button>
+                    <div class="voice-status" id="voiceStatus">Tap to speak</div>
+                    <div class="voice-instructions">
+                        Press and hold for voice commands.<br>
+                        Keep your eyes on the road.
+                    </div>
+                </div>
+
+                <div class="quick-commands">
+                    <div class="quick-command" onclick="quickCommand('navigation')">
+                        <span class="quick-command-icon">🗺️</span>
+                        Navigation
+                    </div>
+                    <div class="quick-command" onclick="quickCommand('music')">
+                        <span class="quick-command-icon">🎵</span>
+                        Music
+                    </div>
+                    <div class="quick-command" onclick="quickCommand('weather')">
+                        <span class="quick-command-icon">🌤️</span>
+                        Weather
+                    </div>
+                    <div class="quick-command" onclick="quickCommand('calls')">
+                        <span class="quick-command-icon">📞</span>
+                        Calls
+                    </div>
+                </div>
+            </div>
+
+            <div class="center-panel">
+                <div class="panel-title">
+                    <span>💬</span>
+                    BUDDY Conversation
+                </div>
+
+                <div class="conversation-display" id="conversationDisplay">
+                    <div class="welcome-screen">
+                        <div class="welcome-icon">🚗</div>
+                        <div class="welcome-title">BUDDY CarPlay</div>
+                        <div class="welcome-text">
+                            Your intelligent driving companion. Use voice commands for safe, hands-free interaction.
+                            I can help with navigation, music, calls, and more.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-avatar">🤖</div>
+                    <div class="typing-content">
+                        <div class="typing-dots">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                        <span>BUDDY is processing...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="panel-title">
+                    <span>🗺️</span>
+                    Navigation & Info
+                </div>
+
+                <div class="navigation-info">
+                    <div class="nav-item">
+                        <span class="nav-label">Destination</span>
+                        <span class="nav-value">Home</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="nav-label">ETA</span>
+                        <span class="nav-value">15 min</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="nav-label">Distance</span>
+                        <span class="nav-value">8.2 mi</span>
+                    </div>
+                    <div class="nav-item">
+                        <span class="nav-label">Traffic</span>
+                        <span class="nav-value">Light</span>
+                    </div>
+                </div>
+
+                <div class="safety-alerts">
+                    <div class="panel-title" style="margin-bottom: 10px; font-size: 16px;">
+                        <span>⚠️</span>
+                        Safety Status
+                    </div>
+                    <div class="alert-item">
+                        <span class="alert-icon">✅</span>
+                        <span>All systems normal</span>
+                    </div>
+                    <div class="alert-item">
+                        <span class="alert-icon">🔋</span>
+                        <span>Battery: Good</span>
+                    </div>
+                    <div class="alert-item">
+                        <span class="alert-icon">🛞</span>
+                        <span>Tire pressure: OK</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="emergency-button" onclick="emergencyAssistance()" title="Emergency Assistance">🚨</button>
+    </div>
+
+    <script>
+        let isListening = false;
+        let isConnected = true;
+        let messageCount = 0;
+        const BUDDY_API = 'http://localhost:8081';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateConnectionStatus(true);
+            // Simulate vehicle status updates
+            setInterval(updateVehicleStatus, 3000);
+        });
+
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            const dot = document.getElementById('connectionDot');
+            dot.className = `connection-dot ${connected ? '' : 'disconnected'}`;
+        }
+
+        function updateVehicleStatus() {
+            // Simulate realistic vehicle data updates
+            // In real implementation, this would come from vehicle API
+        }
+
+        function toggleVoiceControl() {
+            if (!isListening) {
+                startListening();
+            } else {
+                stopListening();
+            }
+        }
+
+        function startListening() {
+            isListening = true;
+            const button = document.getElementById('voiceButton');
+            const status = document.getElementById('voiceStatus');
+            
+            button.classList.add('listening');
+            button.textContent = '🛑';
+            status.textContent = 'Listening... Speak now';
+            
+            // Simulate voice recognition (in real implementation, use Web Speech API)
+            setTimeout(() => {
+                stopListening();
+                processVoiceCommand("Tell me about traffic conditions");
+            }, 3000);
+        }
+
+        function stopListening() {
+            isListening = false;
+            const button = document.getElementById('voiceButton');
+            const status = document.getElementById('voiceStatus');
+            
+            button.classList.remove('listening');
+            button.textContent = '🎤';
+            status.textContent = 'Tap to speak';
+        }
+
+        function quickCommand(type) {
+            const commands = {
+                navigation: "Show me the best route to my destination",
+                music: "Play my driving playlist",
+                weather: "What's the weather like ahead?",
+                calls: "Show my recent calls"
+            };
+            
+            const command = commands[type] || "Help me with " + type;
+            processVoiceCommand(command);
+        }
+
+        async function processVoiceCommand(command) {
+            // Add user message
+            addMessage('user', command);
+            
+            // Show typing indicator
+            showTypingIndicator(true);
+            
+            try {
+                const response = await fetch(`${BUDDY_API}/chat/universal`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: command,
+                        device_type: 'automotive',
+                        user_id: 'car_user_' + Date.now(),
+                        capabilities: {
+                            voice_primary: true,
+                            safety_priority: true,
+                            hands_free: true,
+                            large_display: true,
+                            navigation_integrated: true,
+                            vehicle_data: true
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                setTimeout(() => {
+                    showTypingIndicator(false);
+                    addMessage('buddy', data.response);
+                    updateConnectionStatus(true);
+                    
+                    // Text-to-speech simulation (in real implementation, use Web Speech API)
+                    speakResponse(data.response);
+                }, 1500);
+                
+            } catch (error) {
+                showTypingIndicator(false);
+                addMessage('buddy', 'Connection error. Please check your internet connection.');
+                updateConnectionStatus(false);
+            }
+        }
+
+        function speakResponse(text) {
+            // Simulate text-to-speech
+            console.log('Speaking:', text);
+            
+            // In real implementation:
+            // const utterance = new SpeechSynthesisUtterance(text);
+            // utterance.rate = 0.9;
+            // utterance.pitch = 1.0;
+            // speechSynthesis.speak(utterance);
+        }
+
+        function addMessage(sender, content) {
+            const container = document.getElementById('conversationDisplay');
+            const welcomeScreen = container.querySelector('.welcome-screen');
+            
+            if (welcomeScreen) {
+                welcomeScreen.remove();
+            }
+            
+            const message = document.createElement('div');
+            message.className = `conversation-message ${sender}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = sender === 'user' ? '👤' : '🤖';
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.innerHTML = `
+                ${content}
+                <div class="message-time">${new Date().toLocaleTimeString()}</div>
+            `;
+            
+            message.appendChild(avatar);
+            message.appendChild(messageContent);
+            
+            container.appendChild(message);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showTypingIndicator(show) {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = show ? 'flex' : 'none';
+            
+            if (show) {
+                const container = document.getElementById('conversationDisplay');
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function emergencyAssistance() {
+            const emergencyMessage = "Emergency assistance needed! Please help me contact emergency services.";
+            processVoiceCommand(emergencyMessage);
+            
+            // In real implementation, integrate with vehicle emergency systems
+            alert("Emergency assistance activated. Contacting emergency services...");
+        }
+
+        // Keyboard shortcuts for accessibility
+        document.addEventListener('keydown', function(event) {
+            if (event.key === ' ' && !isListening) {
+                event.preventDefault();
+                toggleVoiceControl();
+            } else if (event.key === 'Escape' && isListening) {
+                stopListening();
+            }
+        });
+
+        // Simulate periodic vehicle data updates
+        setInterval(() => {
+            // Update speed, fuel, temperature, etc.
+            // In real implementation, this would come from vehicle CAN bus or API
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUDDY Email Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 BUDDY 2.0 Enhanced Email Test</h1>
+    
+    <div class="test-container">
+        <h3>🎯 Primary Test: Email Intent Detection</h3>
+        <p>This test verifies that BUDDY recognizes "send a mail" and provides proper email handling.</p>
+        <button class="test-button" onclick="testEmailIntent()">Test "send a mail"</button>
+        <div id="emailTest" class="result"></div>
+    </div>
+
+    <div class="test-container">
+        <h3>📱 Device Management Test</h3>
+        <p>Test device recognition and management capabilities.</p>
+        <button class="test-button" onclick="testDeviceQuery()">Test "what are all the devices connected"</button>
+        <div id="deviceTest" class="result"></div>
+    </div>
+
+    <div class="test-container">
+        <h3>🚀 Capabilities Test</h3>
+        <p>Test BUDDY's ability to describe its enhanced features.</p>
+        <button class="test-button" onclick="testCapabilities()">Test "what can you do"</button>
+        <div id="capabilitiesTest" class="result"></div>
+    </div>
+
+    <div class="test-container">
+        <h3>🔄 Multiple Email Variations</h3>
+        <p>Test different ways to request email functionality.</p>
+        <button class="test-button" onclick="testEmailVariations()">Test Email Variations</button>
+        <div id="variationsTest" class="result"></div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8081';
+        
+        async function sendToBuddy(message, testId) {
+            const resultDiv = document.getElementById(testId);
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Testing...';
+            
+            try {
+                const response = await fetch(`${API_URL}/chat/universal`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        user_id: 'test_user_' + Date.now(),
+                        device_type: 'web',
+                        device_id: 'test_device_' + Date.now(),
+                        session_id: 'test_session_' + Date.now()
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                const buddyResponse = data.response || data.message || 'No response';
+                
+                // Check if it's the old generic response
+                const isGeneric = buddyResponse.includes("I understand you're mentioning");
+                const hasEmailKeywords = /email|recipient|send|mail|who.*send/i.test(buddyResponse);
+                const hasDeviceKeywords = /device|connected|available/i.test(buddyResponse);
+                
+                let status = '';
+                let className = '';
+                
+                if (isGeneric) {
+                    status = '❌ ISSUE: Still showing generic response!';
+                    className = 'result error';
+                } else if (message.toLowerCase().includes('send') && message.toLowerCase().includes('mail') && hasEmailKeywords) {
+                    status = '✅ SUCCESS: Enhanced email response detected!';
+                    className = 'result success';
+                } else if (message.toLowerCase().includes('device') && hasDeviceKeywords) {
+                    status = '✅ SUCCESS: Enhanced device response detected!';
+                    className = 'result success';
+                } else {
+                    status = '✅ SUCCESS: Enhanced response (not generic)';
+                    className = 'result success';
+                }
+                
+                resultDiv.className = className;
+                resultDiv.textContent = `${status}
+
+📝 Message: "${message}"
+🤖 BUDDY Response: "${buddyResponse}"
+
+🔍 Analysis:
+${isGeneric ? '• Generic response detected - needs fix' : '• Enhanced response detected - working!'}
+${hasEmailKeywords ? '• Email keywords found' : ''}
+${hasDeviceKeywords ? '• Device keywords found' : ''}`;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ ERROR: ${error.message}
+
+🔧 Troubleshooting:
+• Ensure BUDDY server is running on port 8081
+• Check network connectivity
+• Verify API endpoint is accessible`;
+            }
+        }
+
+        async function testEmailIntent() {
+            await sendToBuddy('send a mail', 'emailTest');
+        }
+
+        async function testDeviceQuery() {
+            await sendToBuddy('what are all the devices connected', 'deviceTest');
+        }
+
+        async function testCapabilities() {
+            await sendToBuddy('what can you do', 'capabilitiesTest');
+        }
+
+        async function testEmailVariations() {
+            const variations = [
+                'I want to send an email',
+                'help me send email',
+                'compose an email',
+                'send mail to someone'
+            ];
+            
+            const resultDiv = document.getElementById('variationsTest');
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Testing multiple variations...';
+            
+            let results = '';
+            
+            for (const variation of variations) {
+                try {
+                    const response = await fetch(`${API_URL}/chat/universal`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: variation,
+                            user_id: 'test_user_' + Date.now(),
+                            device_type: 'web',
+                            device_id: 'test_device_' + Date.now()
+                        })
+                    });
+
+                    const data = await response.json();
+                    const buddyResponse = data.response || data.message || 'No response';
+                    const isGeneric = buddyResponse.includes("I understand you're mentioning");
+                    
+                    results += `\n📝 "${variation}"\n🤖 ${buddyResponse}\n${isGeneric ? '❌ Generic' : '✅ Enhanced'}\n`;
+                    
+                } catch (error) {
+                    results += `\n📝 "${variation}"\n❌ Error: ${error.message}\n`;
+                }
+                
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            resultDiv.className = 'result success';
+            resultDiv.textContent = `🧪 Email Variation Test Results:${results}`;
+        }
+
+        // Auto-run the primary test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testEmailIntent, 1000);
+        });
+    </script>
+</body>
+</html>

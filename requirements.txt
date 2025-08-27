@@ -1,4 +1,17 @@
-# BUDDY 2.0 Production Requirements for Render Deployment
+fastapi
+uvicorn
+python-dotenv
+motor
+redis
+pydantic
+pytest
+httpx
+
+# Optional extras (install via pip install -r requirements.txt or select subsets)
+# openai
+# opentelemetry-sdk
+# opentelemetry-exporter-otlp
+# firebase-admin# BUDDY 2.0 Production Requirements for Render Deployment
 # Compatible with Python 3.13+
 
 # Core Web Framework

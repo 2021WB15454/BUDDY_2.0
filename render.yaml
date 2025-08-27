@@ -11,8 +11,6 @@ services:
         value: 3.11.0
       - key: BUDDY_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: HOST
         value: 0.0.0.0
       - key: RENDER_EXTERNAL_URL

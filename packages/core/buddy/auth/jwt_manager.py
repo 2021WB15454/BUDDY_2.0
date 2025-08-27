@@ -5,18 +5,16 @@ import jwt
 import bcrypt
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 from enum import Enum
 import asyncio
 import logging
-from pymongo import MongoClient
 from motor.motor_asyncio import AsyncIOMotorClient
 
 logger = logging.getLogger(__name__)
 
 class DeviceType(Enum):
-    """Supported device types for BUDDY"""
     IOS = "ios"
     ANDROID = "android"
     DESKTOP = "desktop"
@@ -27,17 +25,15 @@ class DeviceType(Enum):
 
 @dataclass
 class TokenPair:
-    """Access token and refresh token pair"""
     access_token: str
     refresh_token: str
-    expires_in: int  # Access token expiry in seconds
-    refresh_expires_in: int  # Refresh token expiry in seconds
+    expires_in: int
+    refresh_expires_in: int
 
 @dataclass
 class DeviceSession:
-    """Device session information"""
     device_id: str
-    device_type: DeviceType
+    device_type: str
     device_name: str
     user_agent: str
     ip_address: str
@@ -45,37 +41,31 @@ class DeviceSession:
     created_at: datetime
 
 class BuddyAuthManager:
-    """
-    BUDDY Authentication Manager
-    Handles JWT access tokens and refresh tokens with device-aware sessions
-    """
-    
-    def __init__(self, 
+    """Authentication manager supporting JWT rotation, JTI revocation and audit logging."""
+
+    def __init__(self,
                  jwt_secret: str,
                  mongo_client: AsyncIOMotorClient,
-                 database_name: str = "buddy_db"):
-        """
-        Initialize the authentication manager
-        
-        Args:
-            jwt_secret: Secret key for JWT signing
-            mongo_client: MongoDB client for token storage
-            database_name: Database name for token collections
-        """
-        self.jwt_secret = jwt_secret
+                 database_name: str = "buddy_db",
+                 rotated_secrets: Optional[Dict[str, str]] = None,
+                 active_kid: str = "primary"):
+        # Key rotation state
+        self.jwt_secrets: Dict[str, str] = rotated_secrets.copy() if rotated_secrets else {active_kid: jwt_secret}
+        if active_kid not in self.jwt_secrets:
+            self.jwt_secrets[active_kid] = jwt_secret
+        self.active_kid = active_kid
+        self.jwt_secret = self.jwt_secrets[self.active_kid]
+        # DB and collections
         self.mongo_client = mongo_client
         self.db = mongo_client[database_name]
-        
-        # Collections
         self.refresh_tokens = self.db.refresh_tokens
         self.device_sessions = self.db.device_sessions
         self.token_blacklist = self.db.token_blacklist
-        
-        # Token expiry settings (configurable)
-        self.access_token_expiry = timedelta(minutes=30)  # 30 minutes
-        self.refresh_token_expiry = timedelta(days=7)     # 7 days
-        
-        # Device-specific refresh token expiry
+        self.audit = self.db.audit_events
+        self.revoked_jti = self.db.revoked_jti
+        # Expiry config
+        self.access_token_expiry = timedelta(minutes=30)
+        self.refresh_token_expiry = timedelta(days=7)
         self.device_refresh_expiry = {
             DeviceType.IOS: timedelta(days=30),
             DeviceType.ANDROID: timedelta(days=30),
@@ -116,6 +106,15 @@ class BuddyAuthManager:
                 ("is_active", 1)
             ], name="refresh_token_lookup")
             
+            # Revoked JTI TTL index
+            await self.revoked_jti.create_index(
+                "exp",
+                expireAfterSeconds=0,
+                name="revoked_jti_ttl"
+            )
+
+            await self.audit.create_index([("ts", -1)])
+
             logger.info("Authentication collections initialized successfully")
             
         except Exception as e:
@@ -127,7 +126,7 @@ class BuddyAuthManager:
                               device_id: str, 
                               device_type: DeviceType,
                               roles: Optional[List[str]] = None,
-                              additional_claims: Dict = None) -> str:
+                              additional_claims: Optional[Dict] = None) -> str:
         """
         Generate a short-lived JWT access token
         
@@ -143,6 +142,8 @@ class BuddyAuthManager:
         now = datetime.now(timezone.utc)
         expiry = now + self.access_token_expiry
         
+        import uuid
+        jti = str(uuid.uuid4())
         claims = {
             "sub": user_id,
             "device_id": device_id,
@@ -150,7 +151,8 @@ class BuddyAuthManager:
             "iat": int(now.timestamp()),
             "exp": int(expiry.timestamp()),
             "iss": "buddy-ai",
-            "aud": "buddy-api"
+            "aud": "buddy-api",
+            "jti": jti
         }
         
         if roles:
@@ -158,7 +160,26 @@ class BuddyAuthManager:
         if additional_claims:
             claims.update(additional_claims)
         
-        return jwt.encode(claims, self.jwt_secret, algorithm="HS256")
+        headers = {"kid": self.active_kid}
+        return jwt.encode(claims, self.jwt_secret, algorithm="HS256", headers=headers)
+
+    async def rotate_key(self, kid: str, new_secret: str, activate: bool = True):
+        """Add a new secret (kid) and optionally activate it."""
+        self.jwt_secrets[kid] = new_secret
+        if activate:
+            self.active_kid = kid
+            self.jwt_secret = new_secret
+        await self.audit.insert_one({"type": "key_rotation", "kid": kid, "active": activate, "ts": datetime.utcnow()})
+
+    async def revoke_jti(self, jti: str, exp: int):
+        await self.revoked_jti.update_one({"jti": jti}, {"$set": {"jti": jti, "exp": datetime.fromtimestamp(exp)}}, upsert=True)
+        await self.audit.insert_one({"type": "token_revoked", "jti": jti, "ts": datetime.utcnow()})
+
+    async def log_audit(self, event_type: str, data: Dict):
+        try:
+            await self.audit.insert_one({"type": event_type, "data": data, "ts": datetime.utcnow()})
+        except Exception:
+            pass
     
     def _generate_refresh_token(self) -> str:
         """Generate a cryptographically secure refresh token"""
@@ -248,6 +269,7 @@ class BuddyAuthManager:
             )
             
             logger.info(f"User {user_id} authenticated on device {device_id} ({device_type.value})")
+            await self.log_audit("login", {"user_id": user_id, "device_id": device_id, "device_type": device_type.value})
             
             return TokenPair(
                 access_token=access_token,
@@ -336,6 +358,7 @@ class BuddyAuthManager:
             )
             
             logger.info(f"Access token refreshed for user {token_doc['user_id']} on device {device_id}")
+            await self.log_audit("refresh", {"user_id": token_doc['user_id'], "device_id": device_id})
             
             return TokenPair(
                 access_token=new_access_token,
@@ -348,7 +371,7 @@ class BuddyAuthManager:
             logger.error(f"Token refresh failed for device {device_id}: {e}")
             return None
     
-    def verify_access_token(self, token: str) -> Optional[Dict]:
+    async def verify_access_token(self, token: str) -> Optional[Dict]:
         """
         Verify JWT access token
         
@@ -359,16 +382,26 @@ class BuddyAuthManager:
             Token claims if valid, None otherwise
         """
         try:
-            # Check if token is blacklisted (optional extra security)
-            # This would require storing JTI (JWT ID) in tokens
-            
+            unverified = jwt.get_unverified_header(token)
+            kid = unverified.get("kid", self.active_kid)
+            secret = self.jwt_secrets.get(kid)
+            if not secret:
+                logger.warning(f"Unknown kid {kid}")
+                return None
             claims = jwt.decode(
-                token, 
-                self.jwt_secret, 
+                token,
+                secret,
                 algorithms=["HS256"],
                 audience="buddy-api",
                 issuer="buddy-ai"
             )
+            # Revocation check
+            jti = claims.get("jti")
+            if jti:
+                existing = await self.revoked_jti.find_one({"jti": jti})
+                if existing:
+                    logger.info("token_jti_revoked", extra={"jti": jti})
+                    return None
             
             return claims
             
@@ -381,8 +414,22 @@ class BuddyAuthManager:
         except Exception as e:
             logger.error(f"Token verification error: {e}")
             return None
+
+    # Synchronous compatibility wrapper (legacy callers)
+    def verify_access_token_sync(self, token: str) -> Optional[Dict]:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        if loop.is_running():
+            # Cannot block; schedule task and return None (caller should migrate to async)
+            # For safety, we fallback to creating a task and ignoring result here.
+            asyncio.ensure_future(self.verify_access_token(token))
+            return None
+        return loop.run_until_complete(self.verify_access_token(token))
     
-    async def get_user_devices(self, user_id: str) -> List[DeviceSession]:
+    async def get_user_devices(self, user_id: str) -> List['DeviceSession']:
         """
         Get all active devices for a user
         
@@ -397,15 +444,7 @@ class BuddyAuthManager:
             devices = []
             
             async for doc in cursor:
-                devices.append(DeviceSession(
-                    device_id=doc["device_id"],
-                    device_type=DeviceType(doc["device_type"]),
-                    device_name=doc["device_name"],
-                    user_agent=doc["user_agent"],
-                    ip_address=doc["ip_address"],
-                    last_used=doc["last_used"],
-                    created_at=doc["created_at"]
-                ))
+                devices.append(DeviceSession(device_id=doc["device_id"], device_type=str(DeviceType(doc["device_type"]).value), device_name=doc.get("device_name", ""), user_agent=doc.get("user_agent", ""), ip_address=doc.get("ip_address", ""), last_used=doc.get("last_used", datetime.utcnow()), created_at=doc.get("created_at", datetime.utcnow())))
             
             return devices
             
@@ -510,7 +549,7 @@ class AuthSecurityUtils:
     
     @staticmethod
     def generate_device_id(device_type: DeviceType, 
-                          platform_id: str = None) -> str:
+                          platform_id: Optional[str] = None) -> str:
         """
         Generate a unique device ID
         

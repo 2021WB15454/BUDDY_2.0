@@ -212,7 +212,7 @@ class BuddyAuthAPI:
                 detail="Token refresh service unavailable"
             )
     
-    async def logout(self, user_id: str, device_id: str) -> Dict[str, str]:
+    async def logout(self, user_id: str, device_id: str, access_token: Optional[str] = None) -> Dict[str, str]:
         """
         Logout from specific device
         
@@ -225,6 +225,14 @@ class BuddyAuthAPI:
         """
         try:
             success = await self.auth_manager.revoke_device_session(user_id, device_id)
+            # Revoke JTI of current access token (best-effort)
+            if access_token:
+                try:
+                    claims = await self.auth_manager.verify_access_token(access_token)
+                    if claims and claims.get("jti") and claims.get("exp"):
+                        await self.auth_manager.revoke_jti(claims["jti"], claims["exp"])
+                except Exception:
+                    pass
             
             if success:
                 logger.info(f"User {user_id} logged out from device {device_id}")
@@ -244,7 +252,7 @@ class BuddyAuthAPI:
                 detail="Logout service unavailable"
             )
     
-    async def logout_all_devices(self, user_id: str) -> Dict[str, str]:
+    async def logout_all_devices(self, user_id: str, access_token: Optional[str] = None) -> Dict[str, str]:
         """
         Logout from all devices
         
@@ -256,6 +264,13 @@ class BuddyAuthAPI:
         """
         try:
             success = await self.auth_manager.revoke_all_user_sessions(user_id)
+            if access_token:
+                try:
+                    claims = await self.auth_manager.verify_access_token(access_token)
+                    if claims and claims.get("jti") and claims.get("exp"):
+                        await self.auth_manager.revoke_jti(claims["jti"], claims["exp"])
+                except Exception:
+                    pass
             
             if success:
                 logger.info(f"User {user_id} logged out from all devices")
@@ -289,7 +304,7 @@ class BuddyAuthAPI:
             device_info_list = [
                 DeviceInfo(
                     device_id=device.device_id,
-                    device_type=device.device_type.value,
+                    device_type=device.device_type,
                     device_name=device.device_name,
                     last_used=device.last_used,
                     created_at=device.created_at,
@@ -353,7 +368,7 @@ class BuddyAuthAPI:
             Token claims
         """
         try:
-            claims = self.auth_manager.verify_access_token(credentials.credentials)
+            claims = await self.auth_manager.verify_access_token(credentials.credentials)
             
             if not claims:
                 raise HTTPException(
@@ -427,7 +442,7 @@ class BuddyAuthMiddleware:
         
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
-            claims = self.auth_api.auth_manager.verify_access_token(token)
+            claims = await self.auth_api.auth_manager.verify_access_token(token)
             
             if claims:
                 # Add user info to request state
@@ -463,14 +478,18 @@ def create_auth_routes(app: FastAPI, auth_api: BuddyAuthAPI):
         return await auth_api.refresh_token(request, refresh_data)
     
     @app.post("/auth/logout")
-    async def logout(device_id: str, claims: Dict = Depends(auth_api.verify_token)):
+    async def logout(device_id: str, request: Request, claims: Dict = Depends(auth_api.verify_token)):
         """Logout from current device"""
-        return await auth_api.logout(claims["sub"], device_id)
+        auth_header = request.headers.get("Authorization")
+        token = auth_header.split(" ")[1] if auth_header and auth_header.startswith("Bearer ") else None
+        return await auth_api.logout(claims["sub"], device_id, access_token=token)
     
     @app.post("/auth/logout-all")
-    async def logout_all(claims: Dict = Depends(auth_api.verify_token)):
+    async def logout_all(request: Request, claims: Dict = Depends(auth_api.verify_token)):
         """Logout from all devices"""
-        return await auth_api.logout_all_devices(claims["sub"])
+        auth_header = request.headers.get("Authorization")
+        token = auth_header.split(" ")[1] if auth_header and auth_header.startswith("Bearer ") else None
+        return await auth_api.logout_all_devices(claims["sub"], access_token=token)
     
     @app.get("/auth/devices", response_model=UserDevicesResponse)
     async def get_devices(claims: Dict = Depends(auth_api.verify_token)):

@@ -1,0 +1,128 @@
+version: "3.9"
+
+services:
+  buddy-core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: buddy-core
+    restart: always
+    depends_on:
+      - postgres
+      - chromadb
+      - redis
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgresql://buddy:buddy_secure_2025@postgres:5432/buddydb
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+      - JWT_SECRET=buddy_jwt_secret_2025_change_in_production
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - SYNC_INTERVAL=30
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - buddy-logs:/app/logs
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - buddy-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: buddy-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: buddy
+      POSTGRES_PASSWORD: buddy_secure_2025
+      POSTGRES_DB: buddydb
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db/migrations:/docker-entrypoint-initdb.d/migrations
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U buddy -d buddydb" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - buddy-network
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: buddy-chromadb
+    restart: always
+    environment:
+      - CHROMA_SERVER_AUTHN_CREDENTIALS_FILE=/chroma/server.htpasswd
+      - CHROMA_SERVER_AUTHN_PROVIDER=chromadb.auth.basic.BasicAuthenticationServerProvider
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+      - ./config/chroma.htpasswd:/chroma/server.htpasswd
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - buddy-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: buddy-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass buddy_redis_2025
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - buddy-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: buddy-nginx
+    restart: always
+    depends_on:
+      - buddy-core
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/ssl:/etc/nginx/ssl
+      - buddy-logs:/var/log/nginx
+    networks:
+      - buddy-network
+
+volumes:
+  pgdata:
+    driver: local
+  chroma-data:
+    driver: local
+  redis-data:
+    driver: local
+  buddy-logs:
+    driver: local
+
+networks:
+  buddy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,59 @@
+{
+  "total_tests": 5,
+  "passed": 3,
+  "failed": 2,
+  "success_rate": 60.0,
+  "assessment": "needs_tuning",
+  "results": [
+    {
+      "test": "\ud83c\udfaf Basic Email Intent",
+      "message": "send a mail",
+      "status": "\u2705 PASSED",
+      "success": true,
+      "response": "\ud83d\udce7 I can help you send an email! Who should I send it to? (Please provide email address or contact name)",
+      "response_time": 3065,
+      "intelligence_level": "enhanced_fallback",
+      "reason": "Found 4 success indicators"
+    },
+    {
+      "test": "\ud83d\udce7 Email with Recipient",
+      "message": "send a mail to john.doe@company.com",
+      "status": "\u274c FAILED",
+      "success": false,
+      "response": "\ud83d\udce7 I can help you send an email! Who should I send it to? (Please provide email address or contact name)",
+      "response_time": 2026,
+      "intelligence_level": "enhanced_fallback",
+      "reason": "No success indicators found"
+    },
+    {
+      "test": "\ud83d\udcdd Complex Email Request",
+      "message": "send mail to alice@test.com subject: Project Update Hi Alice, the project is on track",
+      "status": "\u274c FAILED",
+      "success": false,
+      "response": "\ud83d\udce7 I can help you send an email! Who should I send it to? (Please provide email address or contact name)",
+      "response_time": 2046,
+      "intelligence_level": "enhanced_fallback",
+      "reason": "No success indicators found"
+    },
+    {
+      "test": "\ud83d\udde3\ufe0f Natural Language Email",
+      "message": "I need to email Sarah about tomorrow's meeting",
+      "status": "\u2705 PASSED",
+      "success": true,
+      "response": "I'm BUDDY 2.0 with enhanced capabilities. I can help with sending emails, managing devices, calculations, and more. What would you like to do?",
+      "response_time": 2033,
+      "intelligence_level": "enhanced_fallback",
+      "reason": "Found 2 success indicators"
+    },
+    {
+      "test": "\u2709\ufe0f Alternative Phrasing",
+      "message": "help me compose an email",
+      "status": "\u2705 PASSED",
+      "success": true,
+      "response": "I'm BUDDY 2.0 with enhanced capabilities. I can help with sending emails, managing devices, calculations, and more. What would you like to do?",
+      "response_time": 2030,
+      "intelligence_level": "enhanced_fallback",
+      "reason": "Found 2 success indicators"
+    }
+  ]
+}

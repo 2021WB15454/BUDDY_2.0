@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  buddy-core:
+    build:
+      context: .
+      dockerfile: Dockerfile_simple
+    container_name: buddy-core
+    restart: always
+    depends_on:
+      - postgres
+      - chromadb
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgresql://buddy:buddy@postgres:5432/buddydb
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+
+  postgres:
+    image: postgres:15
+    container_name: buddy-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: buddy
+      POSTGRES_PASSWORD: buddy
+      POSTGRES_DB: buddydb
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init_simple.sql:/docker-entrypoint-initdb.d/init.sql
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: buddy-chromadb
+    restart: always
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma-data:/chroma
+
+volumes:
+  pgdata:
+  chroma-data:

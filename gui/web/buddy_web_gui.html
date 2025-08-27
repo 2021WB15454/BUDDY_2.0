@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUDDY 2.0 - Enhanced AI Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            color: white;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 2.5em;
+            font-weight: 300;
+            margin-bottom: 5px;
+        }
+
+        .logo .version {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .features {
+            margin-bottom: 30px;
+        }
+
+        .features h3 {
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-icon {
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+
+        .devices {
+            margin-top: auto;
+        }
+
+        .device-selector {
+            margin-bottom: 10px;
+        }
+
+        .device-selector select {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 14px;
+        }
+
+        .device-selector select option {
+            background: #333;
+        }
+
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            position: relative;
+        }
+
+        .chat-header {
+            background: white;
+            padding: 20px 30px;
+            border-bottom: 1px solid #eee;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .chat-title {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .chat-subtitle {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .status-indicators {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.8em;
+            color: #28a745;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #28a745;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 30px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+
+        .message.user .message-avatar {
+            background: #007bff;
+        }
+
+        .message.buddy .message-avatar {
+            background: #28a745;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 18px;
+            position: relative;
+        }
+
+        .message.user .message-content {
+            background: #007bff;
+            color: white;
+        }
+
+        .message.buddy .message-content {
+            background: white;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .message-time {
+            font-size: 0.7em;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .message-info {
+            font-size: 0.7em;
+            opacity: 0.6;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .input-area {
+            padding: 20px 30px;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .message-input:focus {
+            border-color: #007bff;
+        }
+
+        .send-button {
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 50%;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-button:hover {
+            background: #0056b3;
+        }
+
+        .send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+            margin-left: 60px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #666;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .welcome-message h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .metrics-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            min-width: 200px;
+            display: none;
+        }
+
+        .metrics-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; }
+            .message-content { max-width: 85%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="logo">
+                <h1>🤖 BUDDY</h1>
+                <div class="version">Version 2.0 Enhanced</div>
+            </div>
+
+            <div class="features">
+                <h3>🚀 Enhanced Features</h3>
+                <div class="feature-item">
+                    <span class="feature-icon">🔄</span>
+                    <span>Cross-Platform Sync</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <span>Real-Time Updates</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📊</span>
+                    <span>Performance Metrics</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎯</span>
+                    <span>Device Optimization</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔒</span>
+                    <span>Distributed Rate Limiting</span>
+                </div>
+            </div>
+
+            <div class="devices">
+                <h3>📱 Device Mode</h3>
+                <div class="device-selector">
+                    <select id="deviceType">
+                        <option value="web">🌐 Web Browser</option>
+                        <option value="desktop">💻 Desktop</option>
+                        <option value="mobile">📱 Mobile</option>
+                        <option value="watch">⌚ Smart Watch</option>
+                        <option value="car">🚗 Car Dashboard</option>
+                        <option value="tv">📺 Smart TV</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-chat">
+            <button class="metrics-toggle" onclick="toggleMetrics()">📊 Metrics</button>
+            
+            <div class="metrics-panel" id="metricsPanel">
+                <h4>Performance Metrics</h4>
+                <div id="metricsContent">Loading...</div>
+            </div>
+
+            <div class="chat-header">
+                <div class="chat-title">BUDDY 2.0 Enhanced AI Assistant</div>
+                <div class="chat-subtitle">Cross-platform intelligence with real-time synchronization</div>
+                <div class="status-indicators">
+                    <div class="status-item">
+                        <div class="status-dot"></div>
+                        <span>Connected</span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-dot"></div>
+                        <span>Sync Active</span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-dot"></div>
+                        <span id="deviceStatus">Web Mode</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-area" id="chatArea">
+                <div class="welcome-message">
+                    <h2>👋 Welcome to BUDDY 2.0!</h2>
+                    <p>Your enhanced AI assistant with cross-platform capabilities.</p>
+                    <p>Start chatting to experience the new features!</p>
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+                <span style="margin-left: 10px;">BUDDY is thinking...</span>
+            </div>
+
+            <div class="input-area">
+                <div class="input-container">
+                    <input 
+                        type="text" 
+                        class="message-input" 
+                        id="messageInput" 
+                        placeholder="Ask BUDDY anything..."
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button class="send-button" id="sendButton" onclick="sendMessage()">
+                        ➤
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isConnected = true;
+        let currentDevice = 'web';
+        const BUDDY_API = 'http://localhost:8081';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDeviceStatus();
+            loadMetrics();
+            
+            // Device selector change
+            document.getElementById('deviceType').addEventListener('change', function() {
+                currentDevice = this.value;
+                updateDeviceStatus();
+            });
+        });
+
+        function updateDeviceStatus() {
+            const deviceNames = {
+                'web': '🌐 Web Mode',
+                'desktop': '💻 Desktop Mode',
+                'mobile': '📱 Mobile Mode',
+                'watch': '⌚ Watch Mode',
+                'car': '🚗 Car Mode',
+                'tv': '📺 TV Mode'
+            };
+            document.getElementById('deviceStatus').textContent = deviceNames[currentDevice];
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Clear input and disable send button
+            input.value = '';
+            document.getElementById('sendButton').disabled = true;
+            
+            // Add user message to chat
+            addMessage('user', message);
+            
+            // Show typing indicator
+            showTypingIndicator(true);
+            
+            try {
+                // Send to BUDDY API
+                const response = await fetch(`${BUDDY_API}/chat/universal`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        device_type: currentDevice,
+                        user_id: 'web_user_' + Date.now()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Add BUDDY response
+                setTimeout(() => {
+                    showTypingIndicator(false);
+                    addMessage('buddy', data.response, {
+                        personality: data.personality,
+                        platform_optimized: data.platform_optimized,
+                        sync_completed: data.sync_completed
+                    });
+                }, 1500); // Simulate thinking time
+                
+            } catch (error) {
+                showTypingIndicator(false);
+                addMessage('buddy', 'Sorry, I\'m having trouble connecting. Please check if the BUDDY server is running on http://localhost:8082', {
+                    error: true
+                });
+            }
+            
+            // Re-enable send button
+            document.getElementById('sendButton').disabled = false;
+        }
+
+        function addMessage(sender, content, metadata = {}) {
+            const chatArea = document.getElementById('chatArea');
+            const welcomeMessage = chatArea.querySelector('.welcome-message');
+            
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = sender === 'user' ? 'U' : '🤖';
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.innerHTML = `
+                <div>${content}</div>
+                <div class="message-time">${new Date().toLocaleTimeString()}</div>
+                ${metadata.platform_optimized ? '<div class="message-info">✓ Platform Optimized</div>' : ''}
+                ${metadata.sync_completed ? '<div class="message-info">✓ Synced</div>' : ''}
+                ${metadata.error ? '<div class="message-info">⚠ Connection Error</div>' : ''}
+            `;
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+            
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function showTypingIndicator(show) {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = show ? 'flex' : 'none';
+            
+            if (show) {
+                const chatArea = document.getElementById('chatArea');
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }
+        }
+
+        function toggleMetrics() {
+            const panel = document.getElementById('metricsPanel');
+            if (panel.style.display === 'block') {
+                panel.style.display = 'none';
+            } else {
+                panel.style.display = 'block';
+                loadMetrics();
+            }
+        }
+
+        async function loadMetrics() {
+            try {
+                const response = await fetch(`${BUDDY_API}/system/intel-metrics`);
+                const data = await response.json();
+                
+                const metrics = data.intelligence_metrics;
+                const metricsHTML = `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Memory Summary:</strong><br>
+                        Avg: ${metrics.memory_summary_latency.avg_ms.toFixed(1)}ms<br>
+                        Count: ${metrics.memory_summary_latency.count}
+                    </div>
+                    <div>
+                        <strong>Publish Latency:</strong><br>
+                        Avg: ${metrics.publish_latency.avg_ms.toFixed(1)}ms<br>
+                        Count: ${metrics.publish_latency.count}
+                    </div>
+                `;
+                
+                document.getElementById('metricsContent').innerHTML = metricsHTML;
+            } catch (error) {
+                document.getElementById('metricsContent').innerHTML = 'Metrics unavailable';
+            }
+        }
+
+        // Auto-refresh metrics every 10 seconds if panel is open
+        setInterval(() => {
+            const panel = document.getElementById('metricsPanel');
+            if (panel.style.display === 'block') {
+                loadMetrics();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

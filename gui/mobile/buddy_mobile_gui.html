@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>BUDDY Mobile</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .mobile-container {
+            max-width: 375px;
+            margin: 0 auto;
+            height: 100vh;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        .mobile-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 20px 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .status-bar {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .mobile-title {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+            font-weight: 300;
+        }
+
+        .mobile-subtitle {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .mobile-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .stat-item {
+            text-align: center;
+            font-size: 0.8em;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .mobile-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .mobile-message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .mobile-message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-bubble {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 20px;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .mobile-message.user .message-bubble {
+            background: #007AFF;
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+
+        .mobile-message.buddy .message-bubble {
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-bottom-left-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            margin: 0 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .mobile-message.user .message-avatar {
+            background: #007AFF;
+        }
+
+        .mobile-message.buddy .message-avatar {
+            background: #34C759;
+        }
+
+        .message-time {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 4px;
+            text-align: center;
+        }
+
+        .message-status {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .status-indicator {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: #34C759;
+            color: white;
+        }
+
+        .mobile-input {
+            background: white;
+            padding: 15px 20px;
+            border-top: 1px solid #e1e5e9;
+        }
+
+        .input-container {
+            display: flex;
+            align-items: center;
+            background: #f1f3f4;
+            border-radius: 25px;
+            padding: 8px 15px;
+        }
+
+        .message-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            outline: none;
+            padding: 8px 0;
+        }
+
+        .send-button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 50%;
+            background: #007AFF;
+            color: white;
+            margin-left: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .send-button:active {
+            transform: scale(0.95);
+        }
+
+        .send-button:disabled {
+            background: #c7c7cc;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            padding: 0 20px;
+            margin-bottom: 10px;
+        }
+
+        .typing-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #34C759;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .typing-bubble {
+            background: white;
+            border: 1px solid #e1e5e9;
+            border-radius: 20px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.4; transform: scale(1); }
+            30% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .welcome-screen {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .welcome-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .welcome-title {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .welcome-text {
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .quick-action {
+            background: #f1f3f4;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .quick-action:active {
+            background: #e1e5e9;
+        }
+
+        .device-mode-indicator {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .connection-status {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #34C759;
+        }
+
+        .haptic-feedback {
+            animation: haptic 0.1s;
+        }
+
+        @keyframes haptic {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-container">
+        <div class="mobile-header">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>🔋 85%</span>
+            </div>
+            
+            <div class="connection-status" id="connectionStatus"></div>
+            <div class="device-mode-indicator">📱 Mobile</div>
+            
+            <div class="mobile-title">🤖 BUDDY</div>
+            <div class="mobile-subtitle">Enhanced AI Assistant</div>
+            
+            <div class="mobile-stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="messagesCount">0</div>
+                    <div>Messages</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="syncStatus">✓</div>
+                    <div>Synced</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="responseTime">~50ms</div>
+                    <div>Response</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mobile-chat">
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-screen">
+                    <div class="welcome-icon">👋</div>
+                    <div class="welcome-title">Welcome to BUDDY 2.0!</div>
+                    <div class="welcome-text">
+                        Your mobile AI assistant with cross-platform sync.
+                        Optimized for touch and mobile interactions.
+                    </div>
+                    <div class="quick-actions">
+                        <button class="quick-action" onclick="quickMessage('Hello BUDDY!')">👋 Say Hello</button>
+                        <button class="quick-action" onclick="quickMessage('What can you do?')">❓ Features</button>
+                        <button class="quick-action" onclick="quickMessage('How are you?')">💬 Chat</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-avatar">🤖</div>
+                <div class="typing-bubble">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+
+            <div class="mobile-input">
+                <div class="input-container">
+                    <input 
+                        type="text" 
+                        class="message-input" 
+                        id="messageInput" 
+                        placeholder="Message BUDDY..."
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button class="send-button" id="sendButton" onclick="sendMessage()">
+                        ➤
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let messageCount = 0;
+        let isConnected = true;
+        const BUDDY_API = 'http://localhost:8081';
+
+        // Haptic feedback simulation
+        function hapticFeedback(element) {
+            if (element) {
+                element.classList.add('haptic-feedback');
+                setTimeout(() => element.classList.remove('haptic-feedback'), 100);
+            }
+            
+            // Try to use actual haptic feedback if available
+            if (navigator.vibrate) {
+                navigator.vibrate(10);
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function quickMessage(message) {
+            document.getElementById('messageInput').value = message;
+            sendMessage();
+            hapticFeedback(event.target);
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Haptic feedback
+            hapticFeedback(document.getElementById('sendButton'));
+            
+            // Clear input and disable send button
+            input.value = '';
+            document.getElementById('sendButton').disabled = true;
+            
+            // Add user message
+            addMessage('user', message);
+            messageCount++;
+            updateStats();
+            
+            // Show typing indicator
+            showTypingIndicator(true);
+            
+            const startTime = Date.now();
+            
+            try {
+                const response = await fetch(`${BUDDY_API}/chat/universal`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        device_type: 'mobile',
+                        user_id: 'mobile_user_' + Date.now(),
+                        capabilities: {
+                            screen_size: 'small',
+                            touch_interface: true,
+                            haptic_feedback: true
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                const responseTime = Date.now() - startTime;
+                
+                // Simulate mobile processing delay
+                setTimeout(() => {
+                    showTypingIndicator(false);
+                    addMessage('buddy', data.response, {
+                        platform_optimized: data.platform_optimized,
+                        sync_completed: data.sync_completed,
+                        response_time: responseTime
+                    });
+                    messageCount++;
+                    updateStats(responseTime);
+                }, 800);
+                
+            } catch (error) {
+                showTypingIndicator(false);
+                addMessage('buddy', 'Connection error. Please check if BUDDY server is running.', {
+                    error: true
+                });
+                updateConnectionStatus(false);
+            }
+            
+            document.getElementById('sendButton').disabled = false;
+        }
+
+        function addMessage(sender, content, metadata = {}) {
+            const chatMessages = document.getElementById('chatMessages');
+            const welcomeScreen = chatMessages.querySelector('.welcome-screen');
+            
+            if (welcomeScreen) {
+                welcomeScreen.remove();
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `mobile-message ${sender}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = sender === 'user' ? 'U' : '🤖';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.innerHTML = content;
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'message-status';
+            
+            if (metadata.platform_optimized) {
+                const indicator = document.createElement('span');
+                indicator.className = 'status-indicator';
+                indicator.textContent = '📱 Optimized';
+                statusDiv.appendChild(indicator);
+            }
+            
+            if (metadata.sync_completed) {
+                const indicator = document.createElement('span');
+                indicator.className = 'status-indicator';
+                indicator.textContent = '✓ Synced';
+                statusDiv.appendChild(indicator);
+            }
+            
+            if (metadata.error) {
+                const indicator = document.createElement('span');
+                indicator.className = 'status-indicator';
+                indicator.style.background = '#FF3B30';
+                indicator.textContent = '⚠ Error';
+                statusDiv.appendChild(indicator);
+            }
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(bubble);
+            bubble.appendChild(timeDiv);
+            if (statusDiv.children.length > 0) {
+                bubble.appendChild(statusDiv);
+            }
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Add entry animation
+            messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translateY(10px)';
+            setTimeout(() => {
+                messageDiv.style.transition = 'all 0.3s ease';
+                messageDiv.style.opacity = '1';
+                messageDiv.style.transform = 'translateY(0)';
+            }, 50);
+        }
+
+        function showTypingIndicator(show) {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = show ? 'flex' : 'none';
+            
+            if (show) {
+                const chatMessages = document.getElementById('chatMessages');
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
+
+        function updateStats(responseTime) {
+            document.getElementById('messagesCount').textContent = messageCount;
+            
+            if (responseTime) {
+                document.getElementById('responseTime').textContent = `~${responseTime}ms`;
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            const status = document.getElementById('connectionStatus');
+            status.style.background = connected ? '#34C759' : '#FF3B30';
+            
+            document.getElementById('syncStatus').textContent = connected ? '✓' : '✗';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStats();
+            updateConnectionStatus(true);
+            
+            // Auto-focus input on mobile
+            setTimeout(() => {
+                const input = document.getElementById('messageInput');
+                if (window.innerWidth <= 768) {
+                    input.focus();
+                }
+            }, 1000);
+        });
+
+        // Handle mobile viewport changes
+        window.addEventListener('resize', function() {
+            setTimeout(() => {
+                const chatMessages = document.getElementById('chatMessages');
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 100);
+        });
+
+        // Prevent zoom on input focus (iOS)
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>

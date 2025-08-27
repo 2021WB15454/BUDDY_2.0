@@ -280,8 +280,11 @@
         <div class="chat-container">
             <div class="chat-messages" id="chatMessages">
                 <div class="welcome-message">
-                    👋 Welcome to BUDDY 2.0! I'm your cross-platform AI assistant.<br>
-                    Ask me anything - I can help with time, weather, calculations, and more!
+                    👋 Welcome to BUDDY 2.0 Enhanced! I'm your intelligent cross-platform AI assistant.<br>
+                    I can understand context, remember our conversations, and provide personalized responses!<br>
+                    <small style="margin-top: 10px; display: block; opacity: 0.7;">
+                        🧠 Enhanced Intelligence • 💾 Cross-Device Memory • 🔄 Real-Time Sync
+                    </small>
                 </div>
             </div>
             
@@ -322,9 +325,9 @@
             }
 
             getApiUrl() {
-                // Try to get from environment-like config or fallback
+                // Updated to use correct BUDDY 2.0 Enhanced port
                 const host = window.BUDDY_HOST || 'localhost';
-                const port = window.BUDDY_PORT || '8082';
+                const port = window.BUDDY_PORT || '8081';
                 return `http://${host}:${port}`;
             }
 
@@ -377,16 +380,24 @@
                 this.showTyping(true);
 
                 try {
-                    const response = await fetch(`${this.apiUrl}/chat`, {
+                    const response = await fetch(`${this.apiUrl}/chat/universal`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
+                            'X-Device-Type': 'web',
+                            'X-User-ID': this.getUserId(),
+                            'X-Session-ID': this.getSessionId()
                         },
                         body: JSON.stringify({
                             message: message,
-                            user_id: 'web_user',
+                            user_id: this.getUserId(),
+                            device_id: this.getDeviceId(),
+                            device_type: 'web',
                             session_id: this.getSessionId(),
-                            device_type: 'web'
+                            capabilities: this.getDeviceCapabilities(),
+                            conversation_context: this.getRecentContext(),
+                            ui_context: 'web_interface_2.0',
+                            timestamp: new Date().toISOString()
                         })
                     });
 
@@ -399,9 +410,14 @@
                     // Hide typing indicator
                     this.showTyping(false);
                     
-                    // Add BUDDY's response
+                    // Add BUDDY's response with enhanced metadata
                     if (data.response) {
-                        this.addMessage(data.response, 'buddy');
+                        this.addMessage(data.response, 'buddy', data.metadata);
+                        
+                        // Update connection status with intelligence info
+                        if (data.metadata && data.metadata.intelligence_level) {
+                            this.connectionStatus.textContent = `Connected - Intelligence: ${data.metadata.intelligence_level}`;
+                        }
                     } else if (data.message) {
                         this.addMessage(data.message, 'buddy');
                     } else {
@@ -419,7 +435,7 @@
                 }
             }
 
-            addMessage(text, sender) {
+            addMessage(text, sender, metadata = {}) {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${sender}`;
                 
@@ -430,6 +446,25 @@
                 const content = document.createElement('div');
                 content.className = 'message-content';
                 content.textContent = text;
+                
+                // Add metadata if available
+                if (metadata && Object.keys(metadata).length > 0) {
+                    const metaDiv = document.createElement('div');
+                    metaDiv.style.fontSize = '0.75rem';
+                    metaDiv.style.opacity = '0.7';
+                    metaDiv.style.marginTop = '8px';
+                    metaDiv.style.borderTop = '1px solid rgba(0,0,0,0.1)';
+                    metaDiv.style.paddingTop = '4px';
+                    
+                    let metaText = '';
+                    if (metadata.intelligence_level) metaText += `🧠 ${metadata.intelligence_level} `;
+                    if (metadata.response_time) metaText += `⏱️ ${metadata.response_time}ms `;
+                    if (metadata.device_adapted) metaText += `📱 Device-adapted `;
+                    if (metadata.memory_used) metaText += `💾 Memory-enhanced `;
+                    
+                    metaDiv.textContent = metaText.trim();
+                    content.appendChild(metaDiv);
+                }
                 
                 messageDiv.appendChild(avatar);
                 messageDiv.appendChild(content);
@@ -461,12 +496,60 @@
             }
 
             getSessionId() {
-                let sessionId = localStorage.getItem('buddy_session_id');
+                let sessionId = sessionStorage.getItem('buddy_session_id');
                 if (!sessionId) {
                     sessionId = 'web_session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('buddy_session_id', sessionId);
+                    sessionStorage.setItem('buddy_session_id', sessionId);
                 }
                 return sessionId;
+            }
+
+            getUserId() {
+                let userId = localStorage.getItem('buddy_user_id');
+                if (!userId) {
+                    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('buddy_user_id', userId);
+                }
+                return userId;
+            }
+
+            getDeviceId() {
+                let deviceId = localStorage.getItem('buddy_device_id');
+                if (!deviceId) {
+                    deviceId = 'web_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                    localStorage.setItem('buddy_device_id', deviceId);
+                }
+                return deviceId;
+            }
+
+            getDeviceCapabilities() {
+                return {
+                    screen_size: window.screen.width + 'x' + window.screen.height,
+                    touch_enabled: 'ontouchstart' in window,
+                    voice_enabled: 'speechSynthesis' in window,
+                    camera_enabled: 'mediaDevices' in navigator,
+                    geolocation_enabled: 'geolocation' in navigator,
+                    notifications_enabled: 'Notification' in window,
+                    storage_available: 'localStorage' in window,
+                    interface_type: 'web_browser',
+                    viewport_width: window.innerWidth,
+                    viewport_height: window.innerHeight
+                };
+            }
+
+            getRecentContext() {
+                // Get last few messages for context
+                const messages = this.chatMessages.querySelectorAll('.message');
+                const recentMessages = Array.from(messages).slice(-6).map(msg => {
+                    const content = msg.querySelector('.message-content').textContent;
+                    const isUser = msg.classList.contains('user');
+                    return {
+                        sender: isUser ? 'user' : 'buddy',
+                        content: content,
+                        timestamp: Date.now()
+                    };
+                });
+                return recentMessages;
             }
 
             showError(message) {

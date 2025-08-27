@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=272, height=340, initial-scale=1.0, user-scalable=no">
+    <title>BUDDY Watch</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            height: 340px;
+            width: 272px;
+            overflow: hidden;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .watch-screen {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            border-radius: 20px;
+            border: 3px solid #333;
+            position: relative;
+        }
+
+        .status-bar {
+            height: 25px;
+            background: linear-gradient(to right, #1a1a1a, #2a2a2a);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 12px;
+            font-size: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .time-display {
+            font-weight: 600;
+        }
+
+        .battery-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .battery-icon {
+            width: 18px;
+            height: 10px;
+            border: 1px solid #4fc3f7;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .battery-fill {
+            height: 100%;
+            background: #4fc3f7;
+            width: 85%;
+            border-radius: 1px;
+        }
+
+        .battery-tip {
+            width: 2px;
+            height: 6px;
+            background: #4fc3f7;
+            position: absolute;
+            right: -3px;
+            top: 2px;
+            border-radius: 0 1px 1px 0;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .app-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px 12px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+
+        .app-icon {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .app-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .app-subtitle {
+            font-size: 9px;
+            opacity: 0.8;
+            margin-top: 2px;
+        }
+
+        .quick-actions {
+            background: #1a1a1a;
+            padding: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        .quick-action {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .quick-action:active {
+            background: #3a3a3a;
+            transform: scale(0.95);
+        }
+
+        .quick-action-icon {
+            font-size: 16px;
+        }
+
+        .conversation-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .message-bubble {
+            max-width: 80%;
+            padding: 8px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+
+        .message-bubble.user {
+            background: #4fc3f7;
+            color: #000;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .message-bubble.buddy {
+            background: #2a2a2a;
+            color: #fff;
+            align-self: flex-start;
+            border: 1px solid #444;
+        }
+
+        .message-time {
+            font-size: 8px;
+            opacity: 0.6;
+            margin-top: 3px;
+            text-align: right;
+        }
+
+        .message-bubble.buddy .message-time {
+            text-align: left;
+        }
+
+        .typing-indicator {
+            display: none;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 12px;
+            padding: 8px 10px;
+            align-self: flex-start;
+            width: fit-content;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+        }
+
+        .typing-dot {
+            width: 4px;
+            height: 4px;
+            background: #888;
+            border-radius: 50%;
+            animation: pulse 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes pulse {
+            0%, 60%, 100% { opacity: 0.4; }
+            30% { opacity: 1; }
+        }
+
+        .voice-input {
+            background: #1a1a1a;
+            padding: 12px;
+            border-top: 1px solid #333;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .voice-button {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .voice-button:active {
+            transform: scale(0.9);
+        }
+
+        .voice-button.recording {
+            background: #ff5f57;
+            animation: recording-pulse 1s infinite;
+        }
+
+        @keyframes recording-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .input-method {
+            flex: 1;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 20px;
+            padding: 8px 12px;
+            color: white;
+            font-size: 10px;
+            outline: none;
+            text-align: center;
+        }
+
+        .input-method::placeholder {
+            color: #888;
+        }
+
+        .send-button {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 50%;
+            background: #4fc3f7;
+            color: #000;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-button:active {
+            transform: scale(0.9);
+        }
+
+        .send-button:disabled {
+            background: #555;
+            color: #888;
+        }
+
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .welcome-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .welcome-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .welcome-text {
+            font-size: 10px;
+            line-height: 1.4;
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+
+        .connection-status {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28ca42;
+            z-index: 10;
+        }
+
+        .connection-status.disconnected {
+            background: #ff5f57;
+        }
+
+        .haptic-feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border: 2px solid #4fc3f7;
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .haptic-feedback.active {
+            animation: haptic-pulse 0.3s ease-out;
+        }
+
+        @keyframes haptic-pulse {
+            0% {
+                opacity: 0.8;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 1px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .scroll-thumb {
+            width: 100%;
+            background: #4fc3f7;
+            border-radius: 1px;
+            transition: height 0.2s;
+        }
+    </style>
+</head>
+<body>
+    <div class="watch-screen">
+        <div class="status-bar">
+            <div class="time-display" id="currentTime">10:30</div>
+            <div class="battery-status">
+                <div class="battery-icon">
+                    <div class="battery-fill"></div>
+                    <div class="battery-tip"></div>
+                </div>
+                <span>85%</span>
+            </div>
+        </div>
+
+        <div class="connection-status" id="connectionStatus"></div>
+
+        <div class="main-content">
+            <div class="app-header">
+                <div class="app-icon">🤖</div>
+                <div class="app-title">BUDDY</div>
+                <div class="app-subtitle">Watch Assistant</div>
+            </div>
+
+            <div class="quick-actions">
+                <div class="quick-action" onclick="quickAction('time')">
+                    <div class="quick-action-icon">⏰</div>
+                    <div>Time</div>
+                </div>
+                <div class="quick-action" onclick="quickAction('weather')">
+                    <div class="quick-action-icon">🌤️</div>
+                    <div>Weather</div>
+                </div>
+                <div class="quick-action" onclick="quickAction('reminder')">
+                    <div class="quick-action-icon">📝</div>
+                    <div>Remind</div>
+                </div>
+                <div class="quick-action" onclick="quickAction('health')">
+                    <div class="quick-action-icon">❤️</div>
+                    <div>Health</div>
+                </div>
+            </div>
+
+            <div class="conversation-area" id="conversationArea">
+                <div class="welcome-screen">
+                    <div class="welcome-icon">👋</div>
+                    <div class="welcome-title">BUDDY Watch</div>
+                    <div class="welcome-text">Tap quick actions or speak to get started</div>
+                </div>
+            </div>
+
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+
+            <div class="scroll-indicator" id="scrollIndicator">
+                <div class="scroll-thumb" id="scrollThumb"></div>
+            </div>
+        </div>
+
+        <div class="voice-input">
+            <button class="voice-button" id="voiceButton" onclick="toggleVoiceInput()">🎤</button>
+            <input type="text" class="input-method" id="textInput" placeholder="Type or tap mic" onkeydown="handleKeyDown(event)">
+            <button class="send-button" id="sendButton" onclick="sendMessage()">→</button>
+        </div>
+
+        <div class="haptic-feedback" id="hapticFeedback"></div>
+    </div>
+
+    <script>
+        let isRecording = false;
+        let isConnected = true;
+        let messageCount = 0;
+        const BUDDY_API = 'http://localhost:8081';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTime();
+            setInterval(updateTime, 1000);
+            updateConnectionStatus(true);
+            
+            // Add scroll detection
+            const conversationArea = document.getElementById('conversationArea');
+            conversationArea.addEventListener('scroll', updateScrollIndicator);
+        });
+
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+            });
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            const status = document.getElementById('connectionStatus');
+            status.className = `connection-status ${connected ? '' : 'disconnected'}`;
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function triggerHaptic() {
+            const haptic = document.getElementById('hapticFeedback');
+            haptic.classList.remove('active');
+            setTimeout(() => haptic.classList.add('active'), 10);
+            
+            // Haptic feedback simulation
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }
+
+        function quickAction(action) {
+            triggerHaptic();
+            
+            const messages = {
+                time: "What time is it?",
+                weather: "What's the weather like?",
+                reminder: "Set a reminder",
+                health: "Check my health status"
+            };
+            
+            const message = messages[action] || "Help me with " + action;
+            document.getElementById('textInput').value = message;
+            sendMessage();
+        }
+
+        function toggleVoiceInput() {
+            triggerHaptic();
+            
+            const voiceButton = document.getElementById('voiceButton');
+            
+            if (!isRecording) {
+                startVoiceRecording();
+            } else {
+                stopVoiceRecording();
+            }
+        }
+
+        function startVoiceRecording() {
+            isRecording = true;
+            const voiceButton = document.getElementById('voiceButton');
+            voiceButton.classList.add('recording');
+            voiceButton.textContent = '⏹️';
+            
+            // Simulate voice recognition (in real implementation, use Web Speech API)
+            setTimeout(() => {
+                stopVoiceRecording();
+                document.getElementById('textInput').value = "Voice message received";
+                sendMessage();
+            }, 2000);
+        }
+
+        function stopVoiceRecording() {
+            isRecording = false;
+            const voiceButton = document.getElementById('voiceButton');
+            voiceButton.classList.remove('recording');
+            voiceButton.textContent = '🎤';
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('textInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            triggerHaptic();
+            
+            // Clear input and disable send button
+            input.value = '';
+            document.getElementById('sendButton').disabled = true;
+            
+            // Add user message
+            addMessage('user', message);
+            
+            // Show typing indicator
+            showTypingIndicator(true);
+            
+            try {
+                const response = await fetch(`${BUDDY_API}/chat/universal`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        device_type: 'smartwatch',
+                        user_id: 'watch_user_' + Date.now(),
+                        capabilities: {
+                            screen_size: 'tiny',
+                            touch_input: true,
+                            voice_input: true,
+                            brief_responses: true,
+                            quick_actions: true
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                setTimeout(() => {
+                    showTypingIndicator(false);
+                    addMessage('buddy', data.response);
+                    updateConnectionStatus(true);
+                    triggerHaptic();
+                }, 1000);
+                
+            } catch (error) {
+                showTypingIndicator(false);
+                addMessage('buddy', 'Connection error. Check BUDDY server.');
+                updateConnectionStatus(false);
+            }
+            
+            document.getElementById('sendButton').disabled = false;
+        }
+
+        function addMessage(sender, content) {
+            const container = document.getElementById('conversationArea');
+            const welcomeScreen = container.querySelector('.welcome-screen');
+            
+            if (welcomeScreen) {
+                welcomeScreen.remove();
+            }
+            
+            const messageBubble = document.createElement('div');
+            messageBubble.className = `message-bubble ${sender}`;
+            
+            // Truncate long messages for watch display
+            const truncatedContent = content.length > 120 ? content.substring(0, 120) + '...' : content;
+            messageBubble.innerHTML = `
+                ${truncatedContent}
+                <div class="message-time">${new Date().toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: false 
+                })}</div>
+            `;
+            
+            container.appendChild(messageBubble);
+            container.scrollTop = container.scrollHeight;
+            
+            updateScrollIndicator();
+        }
+
+        function showTypingIndicator(show) {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = show ? 'block' : 'none';
+            
+            if (show) {
+                const container = document.getElementById('conversationArea');
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function updateScrollIndicator() {
+            const container = document.getElementById('conversationArea');
+            const indicator = document.getElementById('scrollIndicator');
+            const thumb = document.getElementById('scrollThumb');
+            
+            const scrollPercentage = container.scrollTop / (container.scrollHeight - container.clientHeight);
+            const thumbHeight = (container.clientHeight / container.scrollHeight) * 100;
+            
+            if (container.scrollHeight > container.clientHeight) {
+                indicator.style.opacity = '1';
+                thumb.style.height = Math.max(thumbHeight, 10) + '%';
+                thumb.style.transform = `translateY(${scrollPercentage * (100 - thumbHeight)}%)`;
+            } else {
+                indicator.style.opacity = '0';
+            }
+        }
+
+        // Touch gestures for watch interface
+        let startY = 0;
+        let currentY = 0;
+
+        document.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+            currentY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchend', function(e) {
+            const deltaY = startY - currentY;
+            
+            // Swipe gestures
+            if (Math.abs(deltaY) > 50) {
+                if (deltaY > 0) {
+                    // Swipe up - scroll to bottom
+                    const container = document.getElementById('conversationArea');
+                    container.scrollTop = container.scrollHeight;
+                } else {
+                    // Swipe down - scroll to top
+                    const container = document.getElementById('conversationArea');
+                    container.scrollTop = 0;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
